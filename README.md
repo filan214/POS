@@ -1,66 +1,112 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Lapak — Point of Sale
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+> A calm, fast point-of-sale system for a small Indonesian *warung*. Ring up sales, track stock automatically, run cashier shifts, and read daily profit at a glance — in English or Bahasa Indonesia.
 
-## About Laravel
+Lapak is a full-stack Laravel application built as a portfolio piece: a real, atomic sales engine behind a custom-designed interface, role-based access, and owner reporting with PDF export.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+---
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Highlights
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- **Atomic checkout** — every sale runs inside a database transaction with row locking, so stock can never go negative and concurrent tills stay consistent.
+- **Self-updating inventory** — each sale decrements stock and writes a `StockMovement` audit row; manual adjustments are logged too.
+- **Cashier shifts** — open/close a till with a cash float, and reconcile expected vs. counted cash at close.
+- **Owner reporting** — today-vs-yesterday deltas, a 7-day trend, category breakdown, top sellers, and shift reconciliation, with **PDF export**.
+- **Role-based access** — owners manage products and see reports; cashiers ring up sales and run their own shifts. Enforced with [spatie/laravel-permission](https://spatie.be/docs/laravel-permission).
+- **Bilingual** — full English / Bahasa Indonesia localization, switchable per user with no hardcoded UI strings.
+- **Hardened image uploads** — product photos are MIME-sniffed server-side, re-encoded to compressed WebP, and stored in a no-exec directory.
 
-## Learning Laravel
+---
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## Tech stack
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+| Layer        | Choice                                                              |
+| ------------ | ------------------------------------------------------------------- |
+| Framework    | Laravel 11 (PHP 8.2+)                                               |
+| Frontend     | Blade + Alpine.js + Tailwind CSS 3, bundled with Vite 6             |
+| Auth         | Laravel Breeze (Blade), rate-limited login, password reset/confirm  |
+| Roles        | spatie/laravel-permission                                           |
+| Images       | Intervention Image (GD) → WebP                                       |
+| PDF          | barryvdh/laravel-dompdf                                             |
+| Database     | SQLite (local dev) · MariaDB (deploy target)                        |
+| Tests        | PHPUnit (in-memory SQLite)                                          |
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+---
 
-## Laravel Sponsors
+## The four screens
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+- **POS** — touch-friendly product grid, live cart, change calculation, instant receipt.
+- **Products** *(owner)* — CRUD with optional photo upload (or emoji), stock adjustment, low-stock flags.
+- **Shifts** — open/close a till; cashiers see only their own history.
+- **Reports** *(owner)* — sales, profit, trends, reconciliation, and PDF export.
 
-### Premium Partners
+---
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+## Getting started (local)
 
-## Contributing
+**Requirements:** PHP 8.2+ with the **GD** extension, Composer, and Node.js 18+.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+```bash
+# 1. Install dependencies
+composer install
+npm install
 
-## Code of Conduct
+# 2. Environment
+cp .env.example .env
+php artisan key:generate
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+# 3. Database — SQLite by default
+touch database/database.sqlite        # Windows: type nul > database\database.sqlite
+php artisan migrate:fresh --seed       # creates schema, roles, demo data
 
-## Security Vulnerabilities
+# 4. Build assets & serve
+npm run dev                            # in one terminal
+php artisan serve                      # in another → http://127.0.0.1:8000
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+> **Important:** always run `migrate:fresh --seed` after a fresh clone — roles and permissions are created by the seeder. Without it, role-protected routes will reject everyone.
+
+### Demo logins
+
+All seeded accounts use the password **`password`**.
+
+| Role    | Email                     | Notes                                   |
+| ------- | ------------------------- | --------------------------------------- |
+| Owner   | `owner@warungtanti.test`  | Filan Pratama — full access             |
+| Cashier | `dewi@warungtanti.test`   | Dewi Lestari — has today's open shift   |
+| Cashier | `budi@warungtanti.test`   | Budi Santoso                            |
+
+In **local/testing only**, the login screen also offers one-tap "Enter as Owner / Cashier" demo buttons. This passwordless shortcut is *not registered in production* — it exists purely for local exploration.
+
+> The owner (Filan) has no open shift by default — open one before selling, or sign in as Dewi who already has one.
+
+---
+
+## Architecture notes
+
+- **Atomic sale** — `PosController@store` wraps the whole checkout in `DB::transaction` with `lockForUpdate` on each product, validates the open shift, stock, and cash tendered, then creates the `Sale` + `SaleItem`s, decrements stock, and logs `StockMovement`s. Returns JSON; the Alpine cart updates local stock on success.
+- **Cost snapshots** — each `SaleItem` stores a `cost_price_snapshot`, so historical profit stays accurate even after prices change.
+- **RBAC** — there is no `role` column; roles live entirely in spatie tables. `User` uses the `HasRoles` trait, and `role:owner` middleware guards the management routes.
+- **Image pipeline** — uploads are validated against a server-side MIME allow-list (JPG/PNG/WebP; SVG rejected), re-encoded to WebP at width ≤ 1000px, and written alongside an `.htaccess` that disables script execution in the upload directory.
+
+---
+
+## Testing
+
+```bash
+php artisan test
+```
+
+Feature tests cover the guest redirect, role-based 403s, atomic stock decrement, and sale rejection when there's no open shift or insufficient stock, plus the inherited Breeze auth flows.
+
+---
+
+## Deployment target
+
+The production target is a **MariaDB** shared host. Point `DB_*` in `.env` at MariaDB, set `APP_ENV=production` and `APP_DEBUG=false`, run `php artisan migrate --force` and (once) the seeder for roles, then `npm run build`. Confirm the **GD** extension is available for image processing.
+
+---
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Built as a portfolio project. Laravel itself is [MIT licensed](https://opensource.org/licenses/MIT).
