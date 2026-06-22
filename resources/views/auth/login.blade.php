@@ -73,7 +73,8 @@
                     <button type="submit" class="btn-primary w-full">{{ __('auth.sign_in') }}</button>
                 </form>
 
-                {{-- Demo accounts --}}
+                {{-- Demo accounts (local/testing only — route is not registered in production) --}}
+                @if (Route::has('login.as'))
                 <div class="mt-8">
                     <div class="flex items-center gap-3 text-xs font-semibold uppercase tracking-wide text-ink-400">
                         <span class="h-px flex-1 bg-ink/10"></span>
@@ -86,6 +87,7 @@
                     </div>
                     <p class="mt-3 text-center text-xs text-ink-400">{{ __('auth.demo_hint') }}</p>
                 </div>
+                @endif
             </div>
         </div>
     </div>

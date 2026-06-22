@@ -10,10 +10,13 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => redirect()->route('pos'));
 
-// Demo shortcut (guests only) — sign in as a seeded owner/cashier.
-Route::get('/login/as/{role}', [LoginController::class, 'loginAs'])
-    ->middleware('guest')
-    ->name('login.as');
+// Demo shortcut — passwordless sign-in as a seeded owner/cashier.
+// Registered ONLY in local/testing so it can never bypass auth in production.
+if (app()->environment(['local', 'testing'])) {
+    Route::get('/login/as/{role}', [LoginController::class, 'loginAs'])
+        ->middleware('guest')
+        ->name('login.as');
+}
 
 // Locale switch — available to guests (login page) too.
 Route::get('/locale/{locale}', [LocaleController::class, 'switch'])->name('locale.switch');
