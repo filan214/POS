@@ -68,5 +68,6 @@ return [
         'pcs' => 'pcs',
         'items' => 'barang',
         'search_everything' => 'Cari…',
+        'check_form' => 'Periksa kembali formulir:',
     ],
 ];

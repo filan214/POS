@@ -19,7 +19,12 @@ class SetLocale
     public function handle(Request $request, Closure $next): Response
     {
         $supported = ['en', 'id'];
-        $locale = $request->session()->get('locale', config('app.locale'));
+
+        // Resolution order: explicit session choice → signed-in user's saved
+        // preference → app default ('id').
+        $locale = $request->session()->get('locale')
+            ?? $request->user()?->locale
+            ?? config('app.locale');
 
         if (! in_array($locale, $supported, true)) {
             $locale = config('app.locale');

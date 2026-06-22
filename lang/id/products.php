@@ -37,12 +37,13 @@ return [
         'sku' => 'SKU',
         'barcode' => 'Barcode',
         'category' => 'Kategori',
+        'emoji' => 'Ikon',
         'cost_price' => 'Harga modal',
         'sell_price' => 'Harga jual',
         'stock_qty' => 'Jumlah stok',
         'reorder_threshold' => 'Batas restok',
         'image' => 'Gambar produk',
-        'image_hint' => 'PNG atau JPG, dikompres ke WebP saat diunggah.',
+        'image_hint' => 'PNG, JPG atau WebP maks 2 MB — otomatis dikompres ke WebP. Opsional.',
         'active' => 'Aktif (tersedia di kasir)',
         'save' => 'Simpan produk',
     ],
@@ -57,5 +58,11 @@ return [
         'sale' => 'Penjualan',
         'restock' => 'Restok',
         'adjustment' => 'Penyesuaian',
+        'manual' => 'Edit stok manual',
+    ],
+
+    'flash' => [
+        'created' => 'Produk ditambahkan',
+        'updated' => 'Produk diperbarui',
     ],
 ];

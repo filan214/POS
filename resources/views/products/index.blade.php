@@ -1,7 +1,5 @@
 @php
-    $products = \App\Support\MockData::products()->values();
-    $stats = \App\Support\MockData::productStats();
-    $movements = \App\Support\MockData::stockMovements();
+    $categories = $products->pluck('category')->unique()->values();
 @endphp
 
 <x-app-layout :title="__('products.title')" active="products">
@@ -13,20 +11,21 @@
             panel: false,
             editing: null,
             imagePreview: null,
-            toast: null,
+            toast: @js(session('status')),
             money(v) { return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(v || 0); },
+            get formAction() { return this.editing ? '{{ url('products') }}/' + this.editing.id : '{{ route('products.store') }}'; },
             get categories() { return ['all', ...new Set(this.products.map(p => p.category))]; },
             get filtered() {
                 const q = this.search.trim().toLowerCase();
                 return this.products.filter(p =>
                     (this.category === 'all' || p.category === this.category) &&
                     (!this.lowOnly || p.stock_qty <= p.reorder_threshold) &&
-                    (!q || p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q) || String(p.barcode).includes(q)));
+                    (!q || p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q) || String(p.barcode || '').includes(q)));
             },
             openNew() { this.editing = null; this.imagePreview = null; this.panel = true; },
             openEdit(p) { this.editing = p; this.imagePreview = null; this.panel = true; },
             preview(e) { const f = e.target.files[0]; if (f) this.imagePreview = URL.createObjectURL(f); },
-            save() { this.panel = false; this.flash('{{ __('common.action.save') }} ✓'); },
+            init() { @if ($errors->any()) this.panel = true; @endif if (this.toast) { clearTimeout(this._t); this._t = setTimeout(() => this.toast = null, 2500); } },
             flash(m) { this.toast = m; clearTimeout(this._t); this._t = setTimeout(() => this.toast = null, 2000); }
          }">
 
@@ -35,6 +34,17 @@
                 <button @click="openNew()" class="btn-primary"><x-icon name="plus" class="h-5 w-5" /> {{ __('products.add') }}</button>
             </x-slot:actions>
         </x-page-header>
+
+        @if ($errors->any())
+            <div class="mt-4 rounded-xl border border-chili/20 bg-chili-50 px-4 py-3 text-sm text-chili-700">
+                <p class="flex items-center gap-2 font-semibold"><x-icon name="alert" class="h-4 w-4" /> {{ __('common.misc.check_form') }}</p>
+                <ul class="mt-1 list-inside list-disc">
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
 
         {{-- Stats --}}
         <div class="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -82,7 +92,10 @@
                             <tr class="hover:bg-paper/50">
                                 <td class="px-5 py-3">
                                     <div class="flex items-center gap-3">
-                                        <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-paper text-xl" x-text="p.emoji"></span>
+                                        <span class="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-paper text-xl">
+                                            <template x-if="p.image_path"><img :src="'/' + p.image_path" class="h-full w-full object-cover" alt=""></template>
+                                            <template x-if="!p.image_path"><span x-text="p.emoji || '📦'"></span></template>
+                                        </span>
                                         <div class="min-w-0">
                                             <p class="truncate font-semibold text-ink-900" x-text="p.name"></p>
                                             <p class="font-mono text-xs text-ink-400" x-text="p.sku + ' · ' + p.barcode"></p>
@@ -129,22 +142,24 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-ink/[.05]">
-                            @foreach ($movements as $m)
+                            @forelse ($movements as $m)
                                 @php
                                     $typeMeta = [
                                         'sale' => ['amber', __('products.movements.sale')],
                                         'restock' => ['jade', __('products.movements.restock')],
                                         'adjustment' => ['ink', __('products.movements.adjustment')],
-                                    ][$m['type']];
+                                    ][$m->type];
                                 @endphp
                                 <tr class="hover:bg-paper/50">
                                     <td class="px-5 py-3"><x-badge :variant="$typeMeta[0]" dot>{{ $typeMeta[1] }}</x-badge></td>
-                                    <td class="px-5 py-3 font-medium text-ink-800">{{ $m['product'] }}</td>
-                                    <td class="px-5 py-3 text-right font-mono font-semibold tabular {{ $m['qty_change'] < 0 ? 'text-chili-600' : 'text-jade-700' }}">{{ $m['qty_change'] > 0 ? '+' : '' }}{{ $m['qty_change'] }}</td>
-                                    <td class="px-5 py-3 font-mono text-xs text-ink-500">{{ $m['note'] }}</td>
-                                    <td class="px-5 py-3 text-right text-xs text-ink-500">{{ $m['at']->diffForHumans() }}</td>
+                                    <td class="px-5 py-3 font-medium text-ink-800">{{ $m->product?->name }}</td>
+                                    <td class="px-5 py-3 text-right font-mono font-semibold tabular {{ $m->qty_change < 0 ? 'text-chili-600' : 'text-jade-700' }}">{{ $m->qty_change > 0 ? '+' : '' }}{{ $m->qty_change }}</td>
+                                    <td class="px-5 py-3 font-mono text-xs text-ink-500">{{ $m->note }}</td>
+                                    <td class="px-5 py-3 text-right text-xs text-ink-500">{{ $m->created_at->diffForHumans() }}</td>
                                 </tr>
-                            @endforeach
+                            @empty
+                                <tr><td colspan="5" class="px-5 py-10 text-center text-sm text-ink-500">—</td></tr>
+                            @endforelse
                         </tbody>
                     </table>
                 </div>
@@ -162,7 +177,8 @@
                     <button @click="panel = false" class="rounded-lg p-1.5 text-ink-500 hover:bg-ink/5"><x-icon name="x" class="h-5 w-5" /></button>
                 </div>
 
-                <form @submit.prevent="save()" class="flex min-h-0 flex-1 flex-col">
+                <form :action="formAction" method="POST" enctype="multipart/form-data" class="flex min-h-0 flex-1 flex-col">
+                    @csrf
                     <div class="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5 scroll-slim">
                         {{-- image --}}
                         <div>
@@ -170,11 +186,12 @@
                             <div class="flex items-center gap-4">
                                 <div class="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-paper text-3xl">
                                     <template x-if="imagePreview"><img :src="imagePreview" class="h-full w-full object-cover" alt=""></template>
-                                    <template x-if="!imagePreview"><span x-text="editing ? editing.emoji : '📦'"></span></template>
+                                    <template x-if="!imagePreview && editing && editing.image_path"><img :src="'/' + editing.image_path" class="h-full w-full object-cover" alt=""></template>
+                                    <template x-if="!imagePreview && !(editing && editing.image_path)"><span x-text="editing ? (editing.emoji || '📦') : '📦'"></span></template>
                                 </div>
                                 <label class="btn-outline cursor-pointer">
                                     <x-icon name="plus" class="h-4 w-4" /> {{ __('products.form.image') }}
-                                    <input type="file" accept="image/*" class="hidden" @change="preview($event)">
+                                    <input type="file" name="image" accept="image/*" class="hidden" @change="preview($event)">
                                 </label>
                             </div>
                             <p class="mt-1.5 text-xs text-ink-400">{{ __('products.form.image_hint') }}</p>
@@ -182,49 +199,56 @@
 
                         <div>
                             <label class="label">{{ __('products.form.name') }}</label>
-                            <input type="text" class="input" :value="editing?.name ?? ''" placeholder="{{ __('products.form.name') }}">
+                            <input type="text" name="name" class="input" :value="editing?.name ?? @js(old('name'))" placeholder="{{ __('products.form.name') }}" required>
                         </div>
                         <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <label class="label">{{ __('products.form.sku') }}</label>
-                                <input type="text" class="input font-mono" :value="editing?.sku ?? ''">
+                                <input type="text" name="sku" class="input font-mono" :value="editing?.sku ?? @js(old('sku'))" required>
                             </div>
                             <div>
                                 <label class="label">{{ __('products.form.barcode') }}</label>
-                                <input type="text" class="input font-mono" :value="editing?.barcode ?? ''">
+                                <input type="text" name="barcode" class="input font-mono" :value="editing?.barcode ?? @js(old('barcode'))">
                             </div>
                         </div>
-                        <div>
-                            <label class="label">{{ __('products.form.category') }}</label>
-                            <input type="text" class="input" :value="editing?.category ?? ''" list="cats">
-                            <datalist id="cats">
-                                @foreach (\App\Support\MockData::categories() as $c)
-                                    <option value="{{ $c }}"></option>
-                                @endforeach
-                            </datalist>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="label">{{ __('products.form.category') }}</label>
+                                <input type="text" name="category" class="input" :value="editing?.category ?? @js(old('category'))" list="cats" required>
+                                <datalist id="cats">
+                                    @foreach ($categories as $c)
+                                        <option value="{{ $c }}"></option>
+                                    @endforeach
+                                </datalist>
+                            </div>
+                            <div>
+                                <label class="label">{{ __('products.form.emoji') }}</label>
+                                <input type="text" name="emoji" class="input text-center text-lg" maxlength="4" :value="editing?.emoji ?? @js(old('emoji'))" placeholder="📦">
+                            </div>
                         </div>
                         <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <label class="label">{{ __('products.form.cost_price') }}</label>
-                                <input type="number" class="input font-mono tabular" :value="editing?.cost_price ?? ''">
+                                <input type="number" name="cost_price" class="input font-mono tabular" :value="editing?.cost_price ?? @js(old('cost_price'))" required>
                             </div>
                             <div>
                                 <label class="label">{{ __('products.form.sell_price') }}</label>
-                                <input type="number" class="input font-mono tabular" :value="editing?.sell_price ?? ''">
+                                <input type="number" name="sell_price" class="input font-mono tabular" :value="editing?.sell_price ?? @js(old('sell_price'))" required>
                             </div>
                         </div>
                         <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <label class="label">{{ __('products.form.stock_qty') }}</label>
-                                <input type="number" class="input font-mono tabular" :value="editing?.stock_qty ?? ''">
+                                <input type="number" name="stock_qty" class="input font-mono tabular" :value="editing?.stock_qty ?? @js(old('stock_qty'))" required>
                             </div>
                             <div>
                                 <label class="label">{{ __('products.form.reorder_threshold') }}</label>
-                                <input type="number" class="input font-mono tabular" :value="editing?.reorder_threshold ?? ''">
+                                <input type="number" name="reorder_threshold" class="input font-mono tabular" :value="editing?.reorder_threshold ?? @js(old('reorder_threshold'))" required>
                             </div>
                         </div>
                         <label class="flex items-center gap-2.5 text-sm font-medium text-ink-700">
-                            <input type="checkbox" checked class="h-4 w-4 rounded border-ink/25 text-jade focus:ring-jade">
+                            <input type="hidden" name="is_active" value="0">
+                            <input type="checkbox" name="is_active" value="1" :checked="editing ? editing.is_active : true" class="h-4 w-4 rounded border-ink/25 text-jade focus:ring-jade">
                             {{ __('products.form.active') }}
                         </label>
                     </div>

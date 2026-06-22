@@ -47,15 +47,22 @@
                 <h1 class="text-2xl font-bold tracking-tight text-ink-900">{{ __('auth.welcome') }}</h1>
                 <p class="mt-1.5 text-sm text-ink-500">{{ __('auth.subtitle') }}</p>
 
-                <form method="POST" action="{{ route('login.attempt') }}" class="mt-8 space-y-4">
+                @if ($errors->any())
+                    <div class="mt-6 flex items-center gap-2 rounded-xl border border-chili/20 bg-chili-50 px-4 py-3 text-sm font-medium text-chili-700">
+                        <x-icon name="alert" class="h-5 w-5 shrink-0" />
+                        <span>{{ $errors->first() }}</span>
+                    </div>
+                @endif
+
+                <form method="POST" action="{{ route('login') }}" class="mt-8 space-y-4">
                     @csrf
                     <div>
                         <label class="label" for="email">{{ __('auth.email') }}</label>
-                        <input id="email" name="email" type="email" value="owner@warung.id"
+                        <input id="email" name="email" type="email" value="{{ old('email', 'owner@warungtanti.test') }}"
                                placeholder="{{ __('auth.email_placeholder') }}" class="input" autocomplete="username">
                     </div>
                     <div>
-                        <label class="label" for="password">{{ __('auth.password') }}</label>
+                        <label class="label" for="password">{{ __('auth.password_label') }}</label>
                         <input id="password" name="password" type="password" value="password"
                                class="input" autocomplete="current-password">
                     </div>

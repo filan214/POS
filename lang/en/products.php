@@ -37,12 +37,13 @@ return [
         'sku' => 'SKU',
         'barcode' => 'Barcode',
         'category' => 'Category',
+        'emoji' => 'Icon',
         'cost_price' => 'Cost price',
         'sell_price' => 'Sell price',
         'stock_qty' => 'Stock quantity',
         'reorder_threshold' => 'Reorder threshold',
         'image' => 'Product image',
-        'image_hint' => 'PNG or JPG, compressed to WebP on upload.',
+        'image_hint' => 'PNG, JPG or WebP up to 2 MB — compressed to WebP automatically. Optional.',
         'active' => 'Active (available at the till)',
         'save' => 'Save product',
     ],
@@ -57,5 +58,11 @@ return [
         'sale' => 'Sale',
         'restock' => 'Restock',
         'adjustment' => 'Adjustment',
+        'manual' => 'Manual stock edit',
+    ],
+
+    'flash' => [
+        'created' => 'Product added',
+        'updated' => 'Product updated',
     ],
 ];

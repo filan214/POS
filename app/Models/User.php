@@ -7,11 +7,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, HasRoles;
 
     /**
      * The attributes that are mass assignable.
@@ -22,7 +23,6 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'role',
         'locale',
     ];
 
@@ -61,7 +61,16 @@ class User extends Authenticatable
 
     public function isOwner(): bool
     {
-        return $this->role === 'owner';
+        return $this->hasRole('owner');
+    }
+
+    /**
+     * The user's primary role name — convenience for views/labels that read
+     * `$user->role`. Backed by spatie roles, not a column.
+     */
+    public function getRoleAttribute(): ?string
+    {
+        return $this->getRoleNames()->first();
     }
 
     /** Initials for the avatar chip, e.g. "Dewi Lestari" → "DL". */

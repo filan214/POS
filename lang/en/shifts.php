@@ -45,4 +45,11 @@ return [
         'diff' => 'Diff',
         'status' => 'Status',
     ],
+
+    'flash' => [
+        'opened' => 'Shift opened',
+        'closed' => 'Shift closed & reconciled',
+        'already_open' => 'You already have an open shift',
+        'none_open' => 'No open shift to close',
+    ],
 ];

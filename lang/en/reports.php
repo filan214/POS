@@ -4,6 +4,8 @@ return [
     'title' => 'Reports',
     'subtitle' => 'Sales, profit and shift performance.',
     'greeting' => 'Good day, :name',
+    'export_title' => 'Sales Report',
+    'generated' => 'Generated',
 
     'range' => [
         'today' => 'Today',

@@ -12,6 +12,9 @@ use App\Support\MockData;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 class DatabaseSeeder extends Seeder
 {
@@ -19,29 +22,31 @@ class DatabaseSeeder extends Seeder
 
     public function run(): void
     {
+        $this->seedRoles();
+
         $owner = User::create([
             'name' => 'Filan Pratama',
             'email' => 'owner@warungtanti.test',
             'password' => Hash::make('password'),
-            'role' => 'owner',
             'locale' => 'id',
         ]);
+        $owner->assignRole('owner');
 
         $dewi = User::create([
             'name' => 'Dewi Lestari',
             'email' => 'dewi@warungtanti.test',
             'password' => Hash::make('password'),
-            'role' => 'cashier',
             'locale' => 'id',
         ]);
+        $dewi->assignRole('cashier');
 
         $budi = User::create([
             'name' => 'Budi Santoso',
             'email' => 'budi@warungtanti.test',
             'password' => Hash::make('password'),
-            'role' => 'cashier',
             'locale' => 'id',
         ]);
+        $budi->assignRole('cashier');
 
         // ---- Products (reuse the curated catalogue) ----------------------
         foreach (MockData::products() as $p) {
@@ -114,6 +119,33 @@ class DatabaseSeeder extends Seeder
                 ]);
             }
         }
+    }
+
+    /**
+     * Create the spatie roles and permissions (PRD §5.3) and grant them.
+     * Owner gets everything; cashier gets the operational subset.
+     */
+    private function seedRoles(): void
+    {
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        $permissions = [
+            'process-sales',
+            'manage-shifts',
+            'manage-products',
+            'view-reports',
+            'manage-users',
+        ];
+
+        foreach ($permissions as $name) {
+            Permission::findOrCreate($name, 'web');
+        }
+
+        $owner = Role::findOrCreate('owner', 'web');
+        $owner->syncPermissions($permissions);
+
+        $cashier = Role::findOrCreate('cashier', 'web');
+        $cashier->syncPermissions(['process-sales', 'manage-shifts']);
     }
 
     /**

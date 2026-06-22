@@ -68,5 +68,6 @@ return [
         'pcs' => 'pcs',
         'items' => 'items',
         'search_everything' => 'Search…',
+        'check_form' => 'Please check the form:',
     ],
 ];

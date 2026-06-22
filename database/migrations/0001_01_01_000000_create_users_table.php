@@ -17,7 +17,9 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
-            $table->enum('role', ['owner', 'cashier'])->default('cashier');
+            // Roles are managed by spatie/laravel-permission (see the
+            // create_permission_tables migration); only the locale preference
+            // lives on the users row (PRD §5.8).
             $table->string('locale', 5)->default('id');
             $table->rememberToken();
             $table->timestamps();

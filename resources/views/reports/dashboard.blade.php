@@ -1,14 +1,3 @@
-@php
-    $user = \App\Support\MockData::currentUser();
-    $stats = \App\Support\MockData::dashboardStats();
-    $trend = \App\Support\MockData::salesTrend();
-    $cats = \App\Support\MockData::categoryBreakdown();
-    $top = \App\Support\MockData::topProducts();
-    $low = \App\Support\MockData::lowStock();
-    $recon = \App\Support\MockData::shiftHistory();
-    $recent = \App\Support\MockData::recentSales();
-@endphp
-
 <x-app-layout :title="__('reports.title')" active="reports">
     <div x-data="{ range: 'today' }">
         <x-page-header :title="__('reports.title')" :subtitle="__('reports.greeting', ['name' => $user['name']])">
@@ -20,7 +9,7 @@
                                 :class="range === '{{ $key }}' ? 'bg-ink text-white' : 'text-ink-600 hover:text-ink-900'">{{ $label }}</button>
                     @endforeach
                 </div>
-                <button onclick="window.print()" class="btn-outline"><x-icon name="printer" class="h-5 w-5" /> {{ __('common.action.export_pdf') }}</button>
+                <a href="{{ route('reports.pdf') }}" class="btn-outline"><x-icon name="printer" class="h-5 w-5" /> {{ __('common.action.export_pdf') }}</a>
             </x-slot:actions>
         </x-page-header>
 

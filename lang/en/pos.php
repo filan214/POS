@@ -58,5 +58,18 @@ return [
         'out_of_stock' => 'Out of stock',
         'stock_limit' => 'Reached available stock',
         'unknown_barcode' => 'Unknown barcode',
+        'saved' => 'Sale completed',
+        'sale_failed' => 'Could not complete the sale',
+    ],
+
+    'no_shift_title' => 'Open a shift to start selling',
+    'no_shift_sub' => 'Sales must be tied to an open till. Open your shift first.',
+    'go_to_shifts' => 'Go to shifts',
+
+    'errors' => [
+        'no_shift' => 'No open shift. Open the till before selling.',
+        'unavailable' => ':name is no longer available.',
+        'insufficient_stock' => 'Not enough stock for :name.',
+        'underpaid' => 'Received amount is below the total.',
     ],
 ];

@@ -1,50 +1,44 @@
 <?php
 
+use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\LocaleController;
+use App\Http\Controllers\PosController;
+use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ReportController;
+use App\Http\Controllers\ShiftController;
 use Illuminate\Support\Facades\Route;
-
-/*
-|--------------------------------------------------------------------------
-| Frontend-only routes
-|--------------------------------------------------------------------------
-| These render the Blade UI against in-memory mock data (App\Support\MockData).
-| Auth, persistence and role middleware land in the backend phase; for now the
-| demo login buttons just set a `role` in the session to drive the UI.
-*/
 
 Route::get('/', fn () => redirect()->route('pos'));
 
-// ---- Auth (mock) ----------------------------------------------------------
-Route::get('/login', fn () => view('auth.login'))->name('login');
+// Demo shortcut (guests only) — sign in as a seeded owner/cashier.
+Route::get('/login/as/{role}', [LoginController::class, 'loginAs'])
+    ->middleware('guest')
+    ->name('login.as');
 
-Route::post('/login', function () {
-    session(['role' => 'owner']);
+// Locale switch — available to guests (login page) too.
+Route::get('/locale/{locale}', [LocaleController::class, 'switch'])->name('locale.switch');
 
-    return redirect()->route('pos');
-})->name('login.attempt');
+// ---- Authenticated app ----------------------------------------------------
+Route::middleware('auth')->group(function () {
+    // POS / sales — both roles.
+    Route::get('/pos', [PosController::class, 'index'])->name('pos');
+    Route::post('/pos/sale', [PosController::class, 'store'])->name('pos.sale');
 
-Route::get('/login/as/{role}', function (string $role) {
-    abort_unless(in_array($role, ['owner', 'cashier'], true), 404);
-    session(['role' => $role]);
+    // Shifts — both roles (own shift); history scoped in controller.
+    Route::get('/shifts', [ShiftController::class, 'index'])->name('shifts');
+    Route::post('/shifts/open', [ShiftController::class, 'open'])->name('shifts.open');
+    Route::post('/shifts/close', [ShiftController::class, 'close'])->name('shifts.close');
 
-    return redirect()->route($role === 'owner' ? 'reports' : 'pos');
-})->name('login.as');
+    // Management — owner only.
+    Route::middleware('role:owner')->group(function () {
+        Route::get('/products', [ProductController::class, 'index'])->name('products');
+        Route::post('/products', [ProductController::class, 'store'])->name('products.store');
+        Route::post('/products/{product}', [ProductController::class, 'update'])->name('products.update');
 
-Route::get('/logout', function () {
-    session()->forget('role');
+        Route::get('/reports', [ReportController::class, 'dashboard'])->name('reports');
+        Route::get('/reports/pdf', [ReportController::class, 'exportPdf'])->name('reports.pdf');
+    });
+});
 
-    return redirect()->route('login');
-})->name('logout');
-
-// ---- Locale switch --------------------------------------------------------
-Route::get('/locale/{locale}', function (string $locale) {
-    abort_unless(in_array($locale, ['en', 'id'], true), 404);
-    session(['locale' => $locale]);
-
-    return redirect()->back(fallback: route('pos'));
-})->name('locale.switch');
-
-// ---- App screens ----------------------------------------------------------
-Route::get('/pos', fn () => view('pos.index'))->name('pos');
-Route::get('/products', fn () => view('products.index'))->name('products');
-Route::get('/shifts', fn () => view('shifts.index'))->name('shifts');
-Route::get('/reports', fn () => view('reports.dashboard'))->name('reports');
+// Breeze auth backend (login, logout, password reset/confirm).
+require __DIR__.'/auth.php';

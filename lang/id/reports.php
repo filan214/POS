@@ -4,6 +4,8 @@ return [
     'title' => 'Laporan',
     'subtitle' => 'Penjualan, laba, dan performa shift.',
     'greeting' => 'Halo, :name',
+    'export_title' => 'Laporan Penjualan',
+    'generated' => 'Dibuat',
 
     'range' => [
         'today' => 'Hari ini',

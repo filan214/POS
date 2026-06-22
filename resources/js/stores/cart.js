@@ -8,18 +8,24 @@ const idr = new Intl.NumberFormat('id-ID', {
 });
 
 /**
- * The POS cart. Frontend-only: products are seeded from server-side mock data
- * passed in from Blade. Later this swaps to a Livewire component backed by the
- * database, but the view contract (items, totals, checkout) stays the same.
+ * The POS cart. Products are seeded from the server (real DB rows) and the
+ * completed sale is POSTed back, where it is persisted atomically and stock is
+ * decremented. The view contract (items, totals, checkout) is unchanged.
  *
  * @param {object} config
  * @param {Array}  config.products   Catalogue rows: {id, sku, barcode, name, category, sell_price, stock_qty}
- * @param {object} config.t         Translated strings used inside JS (e.g. toast text)
+ * @param {object} config.t          Translated strings used inside JS (e.g. toast text)
+ * @param {string} config.saleUrl    POST endpoint for completing a sale
+ * @param {string} config.csrf       CSRF token
+ * @param {boolean} config.hasShift  Whether the cashier has an open shift
  */
-export default function posCart({ products = [], t = {} } = {}) {
+export default function posCart({ products = [], t = {}, saleUrl = '', csrf = '', hasShift = false } = {}) {
     return {
         products,
         t,
+        saleUrl,
+        csrf,
+        hasShift,
         items: [],
         search: '',
         category: 'all',
@@ -27,6 +33,7 @@ export default function posCart({ products = [], t = {} } = {}) {
         stage: 'cart',
         paymentMethod: 'cash',
         paidAmount: '',
+        submitting: false,
         toast: null,
         receiptNo: null,
 
@@ -181,11 +188,55 @@ export default function posCart({ products = [], t = {} } = {}) {
             this.stage = 'cart';
         },
 
-        complete() {
-            if (!this.canComplete) return;
-            this.receiptNo = 'TRX-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' +
-                String(Math.floor(Math.random() * 9000) + 1000);
-            this.stage = 'done';
+        async complete() {
+            if (!this.canComplete || this.submitting) return;
+            if (!this.hasShift) {
+                this.flash(this.t.no_shift || 'No open shift', 'error');
+                return;
+            }
+
+            this.submitting = true;
+            try {
+                const res = await fetch(this.saleUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Accept: 'application/json',
+                        'X-CSRF-TOKEN': this.csrf,
+                    },
+                    body: JSON.stringify({
+                        payment_method: this.paymentMethod,
+                        paid_amount: this.paymentMethod === 'cash' ? this.paid : this.total,
+                        items: this.items.map((i) => ({ id: i.id, qty: i.qty })),
+                    }),
+                });
+
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    const firstError = data.errors ? Object.values(data.errors)[0]?.[0] : null;
+                    this.flash(firstError || data.message || this.t.sale_failed || 'Could not complete the sale', 'error');
+                    return;
+                }
+
+                const data = await res.json();
+                this.receiptNo = data.sale.code;
+
+                // Reflect the new stock levels in the catalogue immediately.
+                this.items.forEach((line) => {
+                    const p = this.products.find((p) => p.id === line.id);
+                    if (p) {
+                        p.stock_qty -= line.qty;
+                        p.is_out = p.stock_qty <= 0;
+                        p.is_low = p.stock_qty > 0 && p.stock_qty <= p.reorder_threshold;
+                    }
+                });
+
+                this.stage = 'done';
+            } catch (e) {
+                this.flash(this.t.sale_failed || 'Could not complete the sale', 'error');
+            } finally {
+                this.submitting = false;
+            }
         },
 
         newSale() {

@@ -1,9 +1,10 @@
 @props(['title' => '', 'active' => ''])
 
 @php
-    $user = \App\Support\MockData::currentUser();
-    $isOwner = $user['role'] === 'owner';
-    $shift = \App\Support\MockData::currentShift();
+    $user = auth()->user();
+    $isOwner = $user->isOwner();
+    $shift = $user->openShift();
+    $lowStockCount = \App\Models\Product::active()->lowStock()->count();
 
     $nav = [
         ['key' => 'pos', 'route' => 'pos', 'icon' => 'pos', 'label' => __('common.nav.pos'), 'show' => true],
@@ -71,26 +72,39 @@
 
         {{-- Shift status + user --}}
         <div class="space-y-3 border-t border-white/10 p-3">
-            <div class="flex items-center gap-2.5 rounded-xl bg-white/[.04] px-3.5 py-2.5">
-                <span class="relative flex h-2.5 w-2.5">
-                    <span class="absolute inline-flex h-full w-full animate-pulse-dot rounded-full bg-jade"></span>
-                    <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-jade"></span>
-                </span>
-                <div class="min-w-0 leading-tight">
-                    <p class="truncate text-xs font-semibold text-white">{{ __('common.misc.shift_open') }} · {{ $shift['code'] }}</p>
-                    <p class="text-[11px] text-white/45">{{ $shift['opened_at']->format('H:i') }} · {{ $shift['cashier'] }}</p>
-                </div>
-            </div>
+            @if ($shift)
+                <a href="{{ route('shifts') }}" class="flex items-center gap-2.5 rounded-xl bg-white/[.04] px-3.5 py-2.5 hover:bg-white/[.07]">
+                    <span class="relative flex h-2.5 w-2.5">
+                        <span class="absolute inline-flex h-full w-full animate-pulse-dot rounded-full bg-jade"></span>
+                        <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-jade"></span>
+                    </span>
+                    <div class="min-w-0 leading-tight">
+                        <p class="truncate text-xs font-semibold text-white">{{ __('common.misc.shift_open') }} · {{ $shift->code }}</p>
+                        <p class="text-[11px] text-white/45">{{ $shift->opened_at->format('H:i') }} · {{ $shift->cashier->name }}</p>
+                    </div>
+                </a>
+            @else
+                <a href="{{ route('shifts') }}" class="flex items-center gap-2.5 rounded-xl bg-white/[.04] px-3.5 py-2.5 hover:bg-white/[.07]">
+                    <span class="h-2.5 w-2.5 rounded-full bg-white/30"></span>
+                    <div class="min-w-0 leading-tight">
+                        <p class="truncate text-xs font-semibold text-white/80">{{ __('shifts.none_title') }}</p>
+                        <p class="text-[11px] text-white/45">{{ __('shifts.open_action') }}</p>
+                    </div>
+                </a>
+            @endif
 
             <div class="flex items-center gap-3 px-1.5">
-                <span class="flex h-9 w-9 items-center justify-center rounded-full bg-jade/20 text-sm font-bold text-jade-100">{{ $user['initials'] }}</span>
+                <span class="flex h-9 w-9 items-center justify-center rounded-full bg-jade/20 text-sm font-bold text-jade-100">{{ $user->initials }}</span>
                 <div class="min-w-0 flex-1 leading-tight">
-                    <p class="truncate text-sm font-semibold text-white">{{ $user['name'] }}</p>
-                    <p class="text-xs text-white/45">{{ __('common.role.'.$user['role']) }}</p>
+                    <p class="truncate text-sm font-semibold text-white">{{ $user->name }}</p>
+                    <p class="text-xs text-white/45">{{ __('common.role.'.$user->role) }}</p>
                 </div>
-                <a href="{{ route('logout') }}" class="rounded-lg p-2 text-white/55 hover:bg-white/10 hover:text-white" title="{{ __('common.action.logout') }}">
-                    <x-icon name="logout" class="h-5 w-5" />
-                </a>
+                <form method="POST" action="{{ route('logout') }}">
+                    @csrf
+                    <button type="submit" class="rounded-lg p-2 text-white/55 hover:bg-white/10 hover:text-white" title="{{ __('common.action.logout') }}">
+                        <x-icon name="logout" class="h-5 w-5" />
+                    </button>
+                </form>
             </div>
         </div>
     </aside>
@@ -114,9 +128,11 @@
                 <x-locale-switcher tone="dark" />
                 <button class="relative rounded-xl border border-ink/10 bg-white p-2 text-ink-600 hover:text-ink-900">
                     <x-icon name="bell" class="h-5 w-5" />
-                    <span class="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-chili px-1 text-[10px] font-bold text-white">{{ \App\Support\MockData::lowStock()->count() }}</span>
+                    @if ($lowStockCount > 0)
+                        <span class="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-chili px-1 text-[10px] font-bold text-white">{{ $lowStockCount }}</span>
+                    @endif
                 </button>
-                <span class="hidden h-9 w-9 items-center justify-center rounded-full bg-ink text-sm font-bold text-white sm:flex">{{ $user['initials'] }}</span>
+                <span class="hidden h-9 w-9 items-center justify-center rounded-full bg-ink text-sm font-bold text-white sm:flex">{{ $user->initials }}</span>
             </div>
         </header>
 

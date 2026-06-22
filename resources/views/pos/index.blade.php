@@ -1,12 +1,13 @@
 @php
-    $products = \App\Support\MockData::products()->values();
-    $shift = \App\Support\MockData::currentShift();
+    $cashierName = auth()->user()->name;
     $t = [
         'all' => __('pos.all'),
         'added' => __('pos.js.added'),
         'out_of_stock' => __('pos.js.out_of_stock'),
         'stock_limit' => __('pos.js.stock_limit'),
         'unknown_barcode' => __('pos.js.unknown_barcode'),
+        'sale_failed' => __('pos.js.sale_failed'),
+        'no_shift' => __('pos.errors.no_shift'),
         'low' => __('common.status.low_stock'),
         'out' => __('common.status.out_of_stock'),
         'pcs' => __('common.misc.pcs'),
@@ -14,7 +15,26 @@
 @endphp
 
 <x-app-layout :title="__('pos.title')" active="pos">
-    <div x-data="posCart({{ Js::from(['products' => $products, 't' => $t]) }})"
+    @unless ($shift)
+        <div class="mb-5 flex flex-col gap-3 rounded-2xl border border-amber/30 bg-amber-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex items-center gap-3">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber/15 text-amber-700"><x-icon name="alert" class="h-5 w-5" /></span>
+                <div>
+                    <p class="font-semibold text-ink-900">{{ __('pos.no_shift_title') }}</p>
+                    <p class="text-sm text-ink-600">{{ __('pos.no_shift_sub') }}</p>
+                </div>
+            </div>
+            <a href="{{ route('shifts') }}" class="btn-primary shrink-0">{{ __('pos.go_to_shifts') }}</a>
+        </div>
+    @endunless
+
+    <div x-data="posCart({{ Js::from([
+            'products' => $products,
+            't' => $t,
+            'saleUrl' => route('pos.sale'),
+            'csrf' => csrf_token(),
+            'hasShift' => (bool) $shift,
+         ]) }})"
          class="grid gap-6 lg:grid-cols-[1fr_400px] xl:grid-cols-[1fr_420px]">
 
         {{-- ============ Catalogue ============ --}}
@@ -55,7 +75,10 @@
                     <button @click="add(p)" :disabled="p.stock_qty === 0"
                             class="card group flex flex-col p-3 text-left transition-all duration-150 enabled:hover:-translate-y-0.5 enabled:hover:shadow-lift disabled:cursor-not-allowed disabled:opacity-55">
                         <div class="flex items-start justify-between">
-                            <span class="flex h-12 w-12 items-center justify-center rounded-xl bg-paper text-2xl" x-text="p.emoji"></span>
+                            <span class="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl bg-paper text-2xl">
+                                <template x-if="p.image_path"><img :src="'/' + p.image_path" class="h-full w-full object-cover" alt=""></template>
+                                <template x-if="!p.image_path"><span x-text="p.emoji || '📦'"></span></template>
+                            </span>
                             <span class="rounded-full px-2 py-0.5 text-[11px] font-bold tabular"
                                   :class="p.stock_qty === 0 ? 'bg-chili-50 text-chili-700' : (p.is_low ? 'bg-amber-50 text-amber-700' : 'bg-jade-50 text-jade-700')"
                                   x-text="p.stock_qty === 0 ? t.out : (p.is_low ? (t.low) : (p.stock_qty + ' ' + t.pcs))"></span>
@@ -187,7 +210,7 @@
                         </div>
 
                         <div class="border-t border-ink/[.06] px-5 py-4">
-                            <button @click="complete()" :disabled="!canComplete" class="btn-primary w-full text-base">
+                            <button @click="complete()" :disabled="!canComplete || submitting" class="btn-primary w-full text-base">
                                 <x-icon name="check" class="h-5 w-5" /> {{ __('pos.complete_sale') }}
                             </button>
                         </div>
@@ -215,7 +238,7 @@
                                 <div class="space-y-0.5 text-[11px]">
                                     <div class="flex justify-between"><span>{{ __('pos.receipt.no') }}</span><span x-text="receiptNo"></span></div>
                                     <div class="flex justify-between"><span>{{ __('pos.receipt.date') }}</span><span x-text="now.toLocaleString('{{ app()->getLocale() === 'en' ? 'en-GB' : 'id-ID' }}')"></span></div>
-                                    <div class="flex justify-between"><span>{{ __('pos.receipt.cashier') }}</span><span>{{ $shift['cashier'] }}</span></div>
+                                    <div class="flex justify-between"><span>{{ __('pos.receipt.cashier') }}</span><span>{{ $cashierName }}</span></div>
                                 </div>
                                 <div class="receipt-rule my-3"></div>
                                 <div class="space-y-1.5">

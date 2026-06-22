@@ -58,5 +58,18 @@ return [
         'out_of_stock' => 'Stok habis',
         'stock_limit' => 'Stok tersedia sudah maksimal',
         'unknown_barcode' => 'Barcode tidak dikenal',
+        'saved' => 'Penjualan selesai',
+        'sale_failed' => 'Penjualan gagal diselesaikan',
+    ],
+
+    'no_shift_title' => 'Buka shift untuk mulai berjualan',
+    'no_shift_sub' => 'Penjualan harus terikat pada shift yang terbuka. Buka shift dulu.',
+    'go_to_shifts' => 'Ke halaman shift',
+
+    'errors' => [
+        'no_shift' => 'Belum ada shift terbuka. Buka kasir sebelum berjualan.',
+        'unavailable' => ':name sudah tidak tersedia.',
+        'insufficient_stock' => 'Stok :name tidak mencukupi.',
+        'underpaid' => 'Uang diterima kurang dari total.',
     ],
 ];

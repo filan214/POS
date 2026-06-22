@@ -45,4 +45,11 @@ return [
         'diff' => 'Selisih',
         'status' => 'Status',
     ],
+
+    'flash' => [
+        'opened' => 'Shift dibuka',
+        'closed' => 'Shift ditutup & direkap',
+        'already_open' => 'Kamu sudah punya shift yang terbuka',
+        'none_open' => 'Tidak ada shift terbuka untuk ditutup',
+    ],
 ];
