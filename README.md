@@ -4,6 +4,10 @@
 
 Lapak is a full-stack Laravel application built as a portfolio piece: a real, atomic sales engine behind a custom-designed interface, role-based access, and owner reporting with PDF export.
 
+<p align="center">
+  <img src="docs/screenshots/login.png" alt="Lapak — sign in" width="900">
+</p>
+
 ---
 
 ## Highlights
@@ -39,6 +43,16 @@ Lapak is a full-stack Laravel application built as a portfolio piece: a real, at
 - **Products** *(owner)* — CRUD with optional photo upload (or emoji), stock adjustment, low-stock flags.
 - **Shifts** — open/close a till; cashiers see only their own history.
 - **Reports** *(owner)* — sales, profit, trends, reconciliation, and PDF export.
+
+---
+
+## Screenshots
+
+| <img src="docs/screenshots/pos.png" width="430"><br>**Point of Sale** — live cart & change | <img src="docs/screenshots/reports.png" width="430"><br>**Owner reports** — trends & profit |
+| :---: | :---: |
+| <img src="docs/screenshots/products.png" width="430"><br>**Products** — catalogue & stock | <img src="docs/screenshots/shifts.png" width="430"><br>**Shifts** — open till & reconciliation |
+
+> The interface is fully bilingual (English / Bahasa Indonesia) — toggle in the top-right of every screen.
 
 ---
 
