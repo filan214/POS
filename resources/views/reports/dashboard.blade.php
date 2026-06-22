@@ -1,12 +1,11 @@
 <x-app-layout :title="__('reports.title')" active="reports">
-    <div x-data="{ range: 'today' }">
+    <div>
         <x-page-header :title="__('reports.title')" :subtitle="__('reports.greeting', ['name' => $user['name']])">
             <x-slot:actions>
                 <div class="inline-flex items-center gap-0.5 rounded-xl border border-ink/10 bg-white p-0.5">
                     @foreach (['today' => __('reports.range.today'), 'last_7' => __('reports.range.last_7'), 'last_30' => __('reports.range.last_30'), 'month' => __('reports.range.month')] as $key => $label)
-                        <button @click="range = '{{ $key }}'"
-                                class="rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors"
-                                :class="range === '{{ $key }}' ? 'bg-ink text-white' : 'text-ink-600 hover:text-ink-900'">{{ $label }}</button>
+                        <a href="{{ route('reports', ['range' => $key]) }}"
+                           class="rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors {{ $range === $key ? 'bg-ink text-white' : 'text-ink-600 hover:text-ink-900' }}">{{ $label }}</a>
                     @endforeach
                 </div>
                 <a href="{{ route('reports.pdf') }}" class="btn-outline"><x-icon name="printer" class="h-5 w-5" /> {{ __('common.action.export_pdf') }}</a>
@@ -28,7 +27,7 @@
                 <div class="flex items-start justify-between">
                     <div>
                         <h2 class="font-bold text-ink-900">{{ __('reports.chart.trend') }}</h2>
-                        <p class="text-sm text-ink-500">{{ __('reports.chart.trend_sub') }}</p>
+                        <p class="text-sm text-ink-500">{{ $range === 'today' ? __('reports.chart.trend_sub_today') : __('reports.chart.trend_sub') }}</p>
                     </div>
                 </div>
                 <div class="mt-4 h-64"><canvas id="trendChart"></canvas></div>

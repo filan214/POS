@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Support\MockData;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -67,38 +68,48 @@ class DatabaseSeeder extends Seeder
         $products = Product::all();
         $cashiers = [$dewi, $budi];
 
-        // ---- Closed shift history + their sales (6 days → yesterday) -----
-        for ($daysAgo = 6; $daysAgo >= 1; $daysAgo--) {
-            $cashier = $cashiers[$daysAgo % 2];
-            $day = Carbon::today()->subDays($daysAgo);
+        // ---- Closed shift history + their sales (60 days → yesterday) ----
+        // A long history gives the dashboard's range toggle (7/30 days, this
+        // month) a full previous period to compare against, so the deltas are
+        // real. A gentle upward trend makes that period-over-period growth read
+        // realistically. Wrapped in a transaction to keep the larger seed fast.
+        $historyDays = 59;
 
-            $shift = Shift::create([
-                'cashier_id' => $cashier->id,
-                'opened_at' => $day->copy()->setTime(8, 0),
-                'closed_at' => $day->copy()->setTime(16, 5),
+        DB::transaction(function () use ($cashiers, $dewi, $products, $historyDays) {
+            for ($daysAgo = $historyDays; $daysAgo >= 1; $daysAgo--) {
+                $cashier = $cashiers[$daysAgo % 2];
+                $day = Carbon::today()->subDays($daysAgo);
+
+                $shift = Shift::create([
+                    'cashier_id' => $cashier->id,
+                    'opened_at' => $day->copy()->setTime(8, 0),
+                    'closed_at' => $day->copy()->setTime(16, 5),
+                    'starting_cash' => 300_000,
+                    'status' => 'closed',
+                ]);
+
+                // Older days are quieter, recent days busier (~14 → ~26 base).
+                $base = (int) round(14 + (($historyDays - $daysAgo) / $historyDays) * 12);
+                $this->seedSales($shift, $cashier, $products, random_int($base, $base + 8), $day);
+
+                $expected = $shift->expectedCash();
+                $discrepancy = [-15_000, -5_000, 0, 0, 5_000][array_rand([-15_000, -5_000, 0, 0, 5_000])];
+                $shift->update([
+                    'cash_expected' => $expected,
+                    'cash_actual' => $expected + $discrepancy,
+                ]);
+            }
+
+            // ---- Today's OPEN shift (Dewi) ------------------------------
+            $openShift = Shift::create([
+                'cashier_id' => $dewi->id,
+                'opened_at' => Carbon::today()->setTime(8, 0),
                 'starting_cash' => 300_000,
-                'status' => 'closed',
+                'status' => 'open',
             ]);
 
-            $this->seedSales($shift, $cashier, $products, random_int(20, 34), $day);
-
-            $expected = $shift->expectedCash();
-            $discrepancy = [-15_000, -5_000, 0, 0, 5_000][array_rand([-15_000, -5_000, 0, 0, 5_000])];
-            $shift->update([
-                'cash_expected' => $expected,
-                'cash_actual' => $expected + $discrepancy,
-            ]);
-        }
-
-        // ---- Today's OPEN shift (Dewi) ----------------------------------
-        $openShift = Shift::create([
-            'cashier_id' => $dewi->id,
-            'opened_at' => Carbon::today()->setTime(8, 0),
-            'starting_cash' => 300_000,
-            'status' => 'open',
-        ]);
-
-        $this->seedSales($openShift, $dewi, $products, 37, Carbon::today());
+            $this->seedSales($openShift, $dewi, $products, 37, Carbon::today());
+        });
 
         // ---- A few restock / adjustment movements for log variety -------
         $byName = $products->keyBy('name');

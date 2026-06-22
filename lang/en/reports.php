@@ -29,6 +29,7 @@ return [
     'chart' => [
         'trend' => 'Sales over time',
         'trend_sub' => 'Daily revenue for the selected range',
+        'trend_sub_today' => 'Hourly revenue today',
         'category' => 'Sales by category',
         'category_sub' => 'Share of revenue',
     ],

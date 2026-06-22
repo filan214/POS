@@ -7,6 +7,7 @@ use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\Shift;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
 use Illuminate\View\View;
@@ -16,15 +17,17 @@ class ReportController extends Controller
     /** Brand palette reused for the category doughnut. */
     private array $palette = ['#0E9F6E', '#16223A', '#E0A100', '#3D5A93', '#D8453A', '#0B7D57', '#6b7793'];
 
-    public function dashboard(): View
+    public function dashboard(Request $request): View
     {
-        return view('reports.dashboard', $this->gather());
+        $range = $this->normalizeRange($request->query('range'));
+
+        return view('reports.dashboard', $this->gather($range));
     }
 
     /** PDF export of today's report (PRD §5.5) via dompdf. */
     public function exportPdf(): Response
     {
-        $data = $this->gather();
+        $data = $this->gather('today');
         $data['generatedAt'] = Carbon::now();
 
         $pdf = Pdf::loadView('reports.pdf', $data)->setPaper('a4');
@@ -32,49 +35,78 @@ class ReportController extends Controller
         return $pdf->download('laporan-'.Carbon::today()->toDateString().'.pdf');
     }
 
-    /** All figures the dashboard and the PDF share. */
-    private function gather(): array
+    /** Allowed range keys; anything else falls back to 'today'. */
+    private const RANGES = ['today', 'last_7', 'last_30', 'month'];
+
+    private function normalizeRange(?string $range): string
     {
-        $today = Carbon::today();
-        $yesterday = Carbon::yesterday();
+        return in_array($range, self::RANGES, true) ? $range : 'today';
+    }
+
+    /** Resolve a range key to its current and previous-period date windows. */
+    private function window(string $range): array
+    {
+        $end = Carbon::today();
+
+        $start = match ($range) {
+            'last_7' => $end->copy()->subDays(6),
+            'last_30' => $end->copy()->subDays(29),
+            'month' => $end->copy()->startOfMonth(),
+            default => $end->copy(), // today
+        };
+
+        // Previous period = the window of equal length immediately before this one.
+        $days = $start->diffInDays($end) + 1;
+        $prevEnd = $start->copy()->subDay();
+        $prevStart = $prevEnd->copy()->subDays($days - 1);
+
+        return compact('start', 'end', 'prevStart', 'prevEnd');
+    }
+
+    /** All figures the dashboard and the PDF share, for the given range. */
+    private function gather(string $range): array
+    {
+        $w = $this->window($range);
 
         return [
             'user' => auth()->user(),
-            'stats' => $this->stats($today, $yesterday),
-            'trend' => $this->trend(),
-            'cats' => $this->categoryBreakdown(),
-            'top' => $this->topProducts(),
+            'range' => $range,
+            'stats' => $this->stats($w['start'], $w['end'], $w['prevStart'], $w['prevEnd']),
+            'trend' => $this->trend($range, $w['start'], $w['end']),
+            'cats' => $this->categoryBreakdown($w['start'], $w['end']),
+            'top' => $this->topProducts($w['start'], $w['end']),
             'low' => Product::active()->lowStock()->orderBy('stock_qty')->get(),
             'recon' => $this->reconciliation(),
             'recent' => $this->recentSales(),
         ];
     }
 
-    private function stats(Carbon $today, Carbon $yesterday): array
+    private function stats(Carbon $start, Carbon $end, Carbon $prevStart, Carbon $prevEnd): array
     {
-        $todayFig = $this->dayFigures($today);
-        $prevFig = $this->dayFigures($yesterday);
+        $cur = $this->figuresBetween($start, $end);
+        $prev = $this->figuresBetween($prevStart, $prevEnd);
 
-        $basket = $todayFig['count'] > 0 ? (int) round($todayFig['sales'] / $todayFig['count']) : 0;
-        $prevBasket = $prevFig['count'] > 0 ? $prevFig['sales'] / $prevFig['count'] : 0;
+        $basket = $cur['count'] > 0 ? (int) round($cur['sales'] / $cur['count']) : 0;
+        $prevBasket = $prev['count'] > 0 ? $prev['sales'] / $prev['count'] : 0;
 
         return [
-            'sales' => $todayFig['sales'],
-            'sales_delta' => $this->delta($todayFig['sales'], $prevFig['sales']),
-            'profit' => $todayFig['profit'],
-            'profit_delta' => $this->delta($todayFig['profit'], $prevFig['profit']),
-            'transactions' => $todayFig['count'],
-            'transactions_delta' => $this->delta($todayFig['count'], $prevFig['count']),
+            'sales' => $cur['sales'],
+            'sales_delta' => $this->delta($cur['sales'], $prev['sales']),
+            'profit' => $cur['profit'],
+            'profit_delta' => $this->delta($cur['profit'], $prev['profit']),
+            'transactions' => $cur['count'],
+            'transactions_delta' => $this->delta($cur['count'], $prev['count']),
             'basket' => $basket,
             'basket_delta' => $this->delta($basket, $prevBasket),
-            'margin' => $todayFig['sales'] > 0 ? round($todayFig['profit'] / $todayFig['sales'] * 100, 1) : 0,
+            'margin' => $cur['sales'] > 0 ? round($cur['profit'] / $cur['sales'] * 100, 1) : 0,
         ];
     }
 
-    /** Sales total, profit and transaction count for a single day. */
-    private function dayFigures(Carbon $day): array
+    /** Sales total, profit and transaction count over an inclusive date range. */
+    private function figuresBetween(Carbon $start, Carbon $end): array
     {
-        $base = Sale::where('status', 'completed')->whereDate('created_at', $day->toDateString());
+        $base = Sale::where('status', 'completed')
+            ->whereBetween('created_at', [$start->copy()->startOfDay(), $end->copy()->endOfDay()]);
 
         $sales = (int) (clone $base)->sum('total');
         $count = (clone $base)->count();
@@ -95,33 +127,50 @@ class ReportController extends Controller
         return round(($now - $prev) / $prev * 100, 1);
     }
 
-    /** Last 7 days of revenue with locale-aware weekday labels. */
-    private function trend(): array
+    /** Revenue trend: hourly for a single day, otherwise daily across the range. */
+    private function trend(string $range, Carbon $start, Carbon $end): array
     {
         $labels = [];
         $values = [];
 
-        for ($i = 6; $i >= 0; $i--) {
-            $day = Carbon::today()->subDays($i);
-            $labels[] = ucfirst($day->isoFormat('ddd'));
-            $values[] = (int) Sale::where('status', 'completed')
-                ->whereDate('created_at', $day->toDateString())
-                ->sum('total');
+        if ($range === 'today') {
+            for ($h = 7; $h <= 22; $h++) {
+                $labels[] = sprintf('%02d:00', $h);
+                $values[] = $this->salesTotalBetween(
+                    $start->copy()->setTime($h, 0),
+                    $start->copy()->setTime($h, 59, 59),
+                );
+            }
+
+            return compact('labels', 'values');
         }
 
-        return ['labels' => $labels, 'values' => $values];
+        // For a week or less use weekday names; longer ranges use day + month.
+        $useWeekday = ($start->diffInDays($end) + 1) <= 7;
+
+        for ($day = $start->copy(); $day <= $end; $day->addDay()) {
+            $labels[] = $useWeekday ? ucfirst($day->isoFormat('ddd')) : $day->isoFormat('D MMM');
+            $values[] = $this->salesTotalBetween($day->copy()->startOfDay(), $day->copy()->endOfDay());
+        }
+
+        return compact('labels', 'values');
     }
 
-    /** Revenue share by category over the last 7 days. */
-    private function categoryBreakdown(): array
+    private function salesTotalBetween(Carbon $from, Carbon $to): int
     {
-        $since = Carbon::today()->subDays(6)->startOfDay();
+        return (int) Sale::where('status', 'completed')
+            ->whereBetween('created_at', [$from, $to])
+            ->sum('total');
+    }
 
+    /** Revenue share by category over the selected range. */
+    private function categoryBreakdown(Carbon $start, Carbon $end): array
+    {
         $rows = SaleItem::query()
             ->join('products', 'products.id', '=', 'sale_items.product_id')
             ->join('sales', 'sales.id', '=', 'sale_items.sale_id')
             ->where('sales.status', 'completed')
-            ->where('sales.created_at', '>=', $since)
+            ->whereBetween('sales.created_at', [$start->copy()->startOfDay(), $end->copy()->endOfDay()])
             ->groupBy('products.category')
             ->selectRaw('products.category AS label, SUM(sale_items.subtotal) AS revenue')
             ->orderByDesc('revenue')
@@ -136,16 +185,14 @@ class ReportController extends Controller
         ])->all();
     }
 
-    /** Best sellers by units sold over the last 7 days. */
-    private function topProducts(): \Illuminate\Support\Collection
+    /** Best sellers by units sold over the selected range. */
+    private function topProducts(Carbon $start, Carbon $end): \Illuminate\Support\Collection
     {
-        $since = Carbon::today()->subDays(6)->startOfDay();
-
         return SaleItem::query()
             ->join('products', 'products.id', '=', 'sale_items.product_id')
             ->join('sales', 'sales.id', '=', 'sale_items.sale_id')
             ->where('sales.status', 'completed')
-            ->where('sales.created_at', '>=', $since)
+            ->whereBetween('sales.created_at', [$start->copy()->startOfDay(), $end->copy()->endOfDay()])
             ->groupBy('products.id', 'products.name', 'products.emoji')
             ->selectRaw('products.name AS name, products.emoji AS emoji, SUM(sale_items.qty) AS sold, SUM(sale_items.subtotal) AS revenue')
             ->orderByDesc('sold')

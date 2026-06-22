@@ -29,6 +29,7 @@ return [
     'chart' => [
         'trend' => 'Penjualan dari waktu ke waktu',
         'trend_sub' => 'Pendapatan harian untuk rentang terpilih',
+        'trend_sub_today' => 'Pendapatan per jam hari ini',
         'category' => 'Penjualan per kategori',
         'category_sub' => 'Porsi pendapatan',
     ],
