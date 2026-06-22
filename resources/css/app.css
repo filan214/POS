@@ -1,0 +1,164 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    html {
+        -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+        @apply bg-paper text-ink-800 antialiased;
+        font-feature-settings: 'cv11', 'ss01';
+    }
+
+    /* Prices, SKUs and quantities line up in columns. */
+    .tabular {
+        font-variant-numeric: tabular-nums;
+    }
+
+    :focus-visible {
+        @apply outline-none ring-2 ring-jade ring-offset-2 ring-offset-paper;
+    }
+}
+
+@layer components {
+    /* ---- Buttons --------------------------------------------------------- */
+    .btn {
+        @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold
+               transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-40;
+    }
+    .btn-primary {
+        @apply btn bg-jade text-white shadow-sm hover:bg-jade-700 active:scale-[.99];
+    }
+    .btn-ink {
+        @apply btn bg-ink text-white hover:bg-ink-700 active:scale-[.99];
+    }
+    .btn-ghost {
+        @apply btn bg-transparent text-ink-700 hover:bg-ink/5;
+    }
+    .btn-outline {
+        @apply btn border border-ink/15 bg-white text-ink-800 hover:border-ink/30 hover:bg-ink/[.02];
+    }
+    .btn-danger {
+        @apply btn bg-chili text-white hover:bg-chili-700 active:scale-[.99];
+    }
+
+    /* ---- Surfaces -------------------------------------------------------- */
+    .card {
+        @apply rounded-2xl border border-ink/[.06] bg-white shadow-card;
+    }
+
+    .input {
+        @apply w-full rounded-xl border border-ink/15 bg-white px-3.5 py-2.5 text-sm text-ink-900
+               placeholder:text-ink-500/60 focus:border-jade focus:ring-0;
+    }
+    .label {
+        @apply mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500;
+    }
+
+    /* ---- Badges --------------------------------------------------------- */
+    .badge {
+        @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold;
+    }
+    .badge-jade { @apply badge bg-jade-50 text-jade-800; }
+    .badge-amber { @apply badge bg-amber-50 text-amber-700; }
+    .badge-chili { @apply badge bg-chili-50 text-chili-700; }
+    .badge-ink { @apply badge bg-ink/[.06] text-ink-700; }
+
+    /* ---- Sidebar nav ---------------------------------------------------- */
+    .nav-link {
+        @apply flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium
+               text-white/55 transition-colors hover:bg-white/[.06] hover:text-white;
+    }
+    .nav-link-active {
+        @apply bg-white/10 text-white;
+    }
+
+    /* ---- Signature: thermal receipt paper ------------------------------ */
+    .receipt-paper {
+        position: relative;
+        background: #ffffff;
+        filter: drop-shadow(0 12px 24px rgba(16, 24, 40, 0.12));
+    }
+    .receipt-paper::before,
+    .receipt-paper::after {
+        content: '';
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 9px;
+        background-size: 14px 14px;
+        background-repeat: repeat-x;
+    }
+    .receipt-paper::before {
+        top: -8px;
+        background-image:
+            linear-gradient(135deg, #ffffff 50%, transparent 50%),
+            linear-gradient(225deg, #ffffff 50%, transparent 50%);
+        background-position: bottom;
+    }
+    .receipt-paper::after {
+        bottom: -8px;
+        background-image:
+            linear-gradient(45deg, #ffffff 50%, transparent 50%),
+            linear-gradient(-45deg, #ffffff 50%, transparent 50%);
+        background-position: top;
+    }
+    .receipt-rule {
+        border-top: 1.5px dashed #c9c6bd;
+    }
+
+    .scroll-slim {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(22, 34, 58, 0.18) transparent;
+    }
+    .scroll-slim::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    .scroll-slim::-webkit-scrollbar-thumb {
+        background-color: rgba(22, 34, 58, 0.18);
+        border-radius: 9999px;
+    }
+}
+
+/* ---- Receipt print fallback (PRD 5.6) ----------------------------------- */
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    .print-area,
+    .print-area * {
+        visibility: visible;
+    }
+    .print-area {
+        position: absolute;
+        inset: 0;
+        margin: 0 auto;
+        width: 80mm;
+        box-shadow: none !important;
+        filter: none !important;
+    }
+    .print-area::before,
+    .print-area::after {
+        display: none;
+    }
+    .no-print {
+        display: none !important;
+    }
+    @page {
+        size: 80mm auto;
+        margin: 4mm;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+    }
+}
