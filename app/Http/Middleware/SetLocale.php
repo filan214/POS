@@ -21,10 +21,17 @@ class SetLocale
         $supported = ['en', 'id'];
 
         // Resolution order: explicit session choice → signed-in user's saved
-        // preference → app default ('id').
-        $locale = $request->session()->get('locale')
-            ?? $request->user()?->locale
-            ?? config('app.locale');
+        // preference → app default ('id'). Guard on hasSession() so the
+        // middleware is safe on session-less routes (e.g. the deploy hook),
+        // where both session() and the session-based user() would otherwise
+        // throw. On normal web routes the session is always present by now.
+        $locale = config('app.locale');
+
+        if ($request->hasSession()) {
+            $locale = $request->session()->get('locale')
+                ?? $request->user()?->locale
+                ?? $locale;
+        }
 
         if (! in_array($locale, $supported, true)) {
             $locale = config('app.locale');

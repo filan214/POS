@@ -1,14 +1,23 @@
-# Deploying Lapak (MariaDB shared host)
+# Deploying Lapak (Hostinger Single — shared, no SSH)
 
-This guide deploys Lapak to a typical **cPanel-style shared host** backed by
-**MariaDB** — the production target for the project. The same steps apply to a
-VPS; only the "set the document root" part differs.
+The production target is **Hostinger's "Single" shared plan**, backed by
+**MariaDB**. This tier has **no SSH** (confirmed with Hostinger support — SSH
+starts at Web Premium), and hPanel's Git integration only *copies files* — it
+runs no `composer`, `npm`, or `artisan`. So the app is **built in GitHub Actions**
+and a pre-built `deploy` branch is **auto-deployed by hPanel Git**.
 
-> **Compatibility is verified.** The schema, the full seed (~1,400 sales over
-> 60 days), and the entire PHPUnit suite (22 tests) all run green against
-> **MariaDB 10.4** with Laravel's strict SQL mode (`ONLY_FULL_GROUP_BY`
-> included). Local development still uses SQLite; only the deploy target is
-> MariaDB.
+```
+ push to main ──> GitHub Actions ──> force-push built tree ──> deploy branch
+                  (composer + npm)                                  │
+                                                       hPanel Git auto-deploy
+                                                                    │
+                                                          Hostinger (serves it)
+```
+
+> **Compatibility is verified.** Schema, the full seed (~1,400 sales over 60
+> days), and the entire test suite (26 tests) run green against **MariaDB 10.4**
+> under Laravel's strict SQL mode. The `mysql` driver is used (broadly compatible
+> with MariaDB and what hPanel's tutorials assume). Local dev stays on SQLite.
 
 ---
 
@@ -16,162 +25,180 @@ VPS; only the "set the document root" part differs.
 
 | Need            | Notes                                                        |
 | --------------- | ----------------------------------------------------------- |
-| PHP **8.2+**    | with extensions **`pdo_mysql`**, **`gd`**, `mbstring`, `openssl`, `bcmath`, `ctype`, `fileinfo`, `xml` |
-| **MariaDB 10.4+** (or MySQL 8) | one database + one user with full privileges on it |
-| Composer        | to install PHP dependencies                                  |
-| Node.js 18+     | to build front-end assets — **locally if the host has no Node** (see step 5) |
+| PHP **8.2+**    | hPanel → Advanced → PHP Configuration. Extensions: **`pdo_mysql`**, **`gd`**, `mbstring`, `openssl`, `bcmath`, `ctype`, `fileinfo`, `xml` |
+| **MariaDB**     | one database + one user (created in hPanel → Databases)      |
+| GitHub account  | the repo, connected to hPanel Git over OAuth                 |
 
-Quick extension check (run on the host, or via a one-line PHP script):
-
-```bash
-php -m | grep -Ei 'pdo_mysql|gd|mbstring|fileinfo'
-```
-
-`gd` is required for the product-image → WebP pipeline; `pdo_mysql` for the
-database. If either is missing, enable it in the host's PHP settings (cPanel:
-*Select PHP Version → Extensions*).
+`gd` powers the product-image → WebP pipeline; `pdo_mysql` the database. Composer
+and Node are **not** needed on the host — the build happens in CI.
 
 ---
 
-## 2. Create the database
+## 2. One-time GitHub Actions setup
 
-In cPanel **MySQL® Databases** (or via SQL):
+The workflow lives at `.github/workflows/deploy-hostinger.yml`. It needs no
+secrets — it pushes the `deploy` branch using the built-in `GITHUB_TOKEN`
+(`permissions: contents: write` is set in the file).
 
-```sql
-CREATE DATABASE cpuser_lapak CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'cpuser_lapak'@'localhost' IDENTIFIED BY 'a-strong-password';
-GRANT ALL PRIVILEGES ON cpuser_lapak.* TO 'cpuser_lapak'@'localhost';
-FLUSH PRIVILEGES;
-```
+1. Push `main` to GitHub (or trigger **Actions → Build and Deploy to Hostinger →
+   Run workflow**). The job installs prod dependencies, builds assets, and
+   force-pushes the result to a **`deploy`** branch.
+2. Confirm the `deploy` branch appears in the repo and contains `vendor/` and
+   `public/build/` (force-added past `.gitignore` on purpose).
 
-Note the **prefixed** names cPanel assigns (e.g. `cpuser_lapak`) — you'll plug
-them into `.env` next.
-
----
-
-## 3. Get the code onto the server
-
-```bash
-git clone https://github.com/filan214/POS.git lapak
-cd lapak
-composer install --no-dev --optimize-autoloader
-```
-
-(No git on the host? Build a release locally — `composer install --no-dev` —
-and upload everything **except** `node_modules/` and `.git/`.)
+If pushing the branch is rejected, enable **Settings → Actions → General →
+Workflow permissions → Read and write permissions** on the repo.
 
 ---
 
-## 4. Configure the environment
+## 3. One-time hPanel Git setup
 
-```bash
-cp .env.production.example .env
-php artisan key:generate
-```
+In hPanel → **Websites → Advanced → GIT**:
 
-Then edit `.env` and set at least:
+1. **Create repository** → authorize GitHub (OAuth), pick this repo, set
+   **branch = `deploy`**, and choose the install directory (see §6 about the
+   document root).
+2. Enable **auto-deployment** so each new commit on `deploy` is pulled
+   automatically. (hPanel shows a webhook URL; with auto-deploy on, pushes from
+   CI deploy without manual action.)
 
-- `APP_URL` — your public URL
-- `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD` — from step 2
-- `SESSION_DOMAIN` — your domain (and keep `SESSION_SECURE_COOKIE=true` if HTTPS)
+---
+
+## 4. Create the database
+
+hPanel → **Databases → MySQL Databases**: create a database and a user (Hostinger
+prefixes both, e.g. `u123456789_lapak`), and grant the user all privileges on it.
+Note the database name, username, and password for the next step.
+
+---
+
+## 5. Configure `.env` (once, via File Manager)
+
+There is no SSH, so create `.env` by hand:
+
+1. hPanel → **Files → File Manager**, open the deployed app directory.
+2. Copy `.env.production.example` to `.env`.
+3. Fill in:
+   - `APP_URL` — your public URL
+   - `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD` — from §4
+   - `SESSION_DOMAIN` — your domain (keep `SESSION_SECURE_COOKIE=true` on HTTPS)
+   - `APP_KEY` — generate locally (`php -r "echo 'base64:'.base64_encode(random_bytes(32)).PHP_EOL;"`) and paste it, since there's no SSH to run `key:generate`.
+   - `DEPLOY_MIGRATE_TOKEN` — only if you'll use the migration route (§7, fallback)
 
 `APP_ENV=production` and `APP_DEBUG=false` are already set in the template.
 
+> ⚠️ **`.env` and redeploys.** `.env` is **not** on any branch. hPanel Git
+> auto-deploy can overwrite/remove untracked files when it syncs the `deploy`
+> branch. **Back up `.env` (download a copy) before the first real redeploy** and
+> confirm it survives. If it gets wiped, restore it from the backup. Watch the
+> same for `public/uploads/` (uploaded product images live there).
+
 ---
 
-## 5. Build front-end assets
+## 6. Document root
 
-Vite compiles Tailwind/Alpine into `public/build`. If the host has Node:
+Laravel must be served from its **`public/`** directory — never the project root
+(that would expose `.env`). Hostinger's default web root is `public_html`. Two
+workable layouts:
 
-```bash
-npm ci
-npm run build
+- **Deploy beside `public_html`** (recommended): set the hPanel Git install
+  directory to a folder *next to* `public_html` (e.g. `~/lapak`), then make
+  `public_html` a **symlink** to `~/lapak/public`, or put a tiny `index.php` in
+  `public_html` that requires `../lapak/public/index.php` and the autoloader.
+- **Set the doc root to the app's `public/`** if your plan lets you change the
+  website's document root in hPanel.
+
+Pick whichever the plan allows and **verify on the first deploy** that
+`https://your-domain` serves the app and that `https://your-domain/.env` is
+**not** reachable.
+
+---
+
+## 7. Run migrations (no SSH)
+
+Migrations are applied by the idempotent command
+**`php artisan app:run-pending-migrations`** (a safe wrapper over
+`migrate --force`). Trigger it one of two ways:
+
+### Preferred — hPanel Cron Job (no public surface)
+
+hPanel → **Advanced → Cron Jobs** → add a job running:
+
+```
+/usr/bin/php /home/uXXXXXXXXX/<app-path>/artisan app:run-pending-migrations >> /home/uXXXXXXXXX/migrate.log 2>&1
 ```
 
-If it doesn't (common on shared hosting), run the build **locally** and upload
-the generated `public/build/` directory. Assets are content-hashed, so just
-keep `public/build` in sync with the deployed code.
+Schedule it to run periodically (e.g. every few minutes/hours — confirm the
+minimum interval allowed on Single). It's a no-op when nothing is pending, so
+running it often is harmless. Cron can run **any** artisan command, so a one-off
+job with `php artisan db:seed --force` is also how you'd load demo data (see §8).
 
----
+### Fallback — token-protected route (when cron isn't available)
 
-## 6. Migrate and seed
+Set `DEPLOY_MIGRATE_TOKEN` in `.env` to a long random value
+(`php -r "echo bin2hex(random_bytes(24)).PHP_EOL;"`), then after each deploy hit:
 
-```bash
-php artisan migrate --force
+```
+https://your-domain/deploy/migrate?token=YOUR_TOKEN
 ```
 
-Then seed. **Choose one:**
+(browser, or `curl`/`wget`). It runs pending migrations and prints the result.
 
-- **Live portfolio demo** — load the demo accounts and ~60 days of sales so the
-  dashboard looks alive:
+Why this is safe to leave in the repo permanently — necessary, since files on the
+`deploy` branch reappear on every redeploy:
 
-  ```bash
-  php artisan db:seed --force
-  ```
+- **Disabled by default:** 404s unless `DEPLOY_MIGRATE_TOKEN` is set.
+- **Constant-time token check;** a wrong/missing token 404s (no existence leak).
+- **Only ever runs idempotent migrations** — no data exposure, nothing
+  destructive.
+- **Works on the first deploy:** the route is registered without session/CSRF
+  middleware, so it doesn't need the (not-yet-created) `sessions` table.
 
-  Seeded logins use the password `password` (see the README). Dates are
-  relative to the seed run, so re-seed if the data ever looks stale.
-
-- **Real production (no demo data)** — you still need the **roles &
-  permissions**, or every role-guarded route returns 403. The role setup lives
-  in `DatabaseSeeder::seedRoles()`; for a clean production install, extract it
-  into its own seeder (e.g. `RoleSeeder`) and run only that, then create your
-  real owner account manually. *(The current seeder always includes demo data,
-  which is intentional for the portfolio demo.)*
+> If you use cron, leave `DEPLOY_MIGRATE_TOKEN` blank so the route stays disabled.
 
 ---
 
-## 7. Cache config for production
+## 8. Seed roles (and optional demo data)
 
-```bash
-php artisan config:cache
-php artisan route:cache
-php artisan view:cache
-```
+The app needs **roles & permissions** seeded, or every role-guarded route returns
+403. Roles live in `DatabaseSeeder::seedRoles()`. Without SSH, run the seeder via
+a **one-off hPanel Cron Job**:
 
-Re-run these after any `.env` change. To undo: `php artisan optimize:clear`.
+- **Portfolio demo (accounts + ~60 days of sales):** `php artisan db:seed --force`
+  — seeded logins use the password `password` (see the README). Dates are
+  relative to the seed run, so re-seed if the data looks stale.
+- **Real production (no demo data):** extract `seedRoles()` into its own
+  `RoleSeeder` and run only that (`php artisan db:seed --class=RoleSeeder
+  --force`), then create your real owner account. *(The current seeder always
+  bundles demo data — intentional for the portfolio demo.)*
 
----
-
-## 8. Point the web server at `public/`
-
-The document root **must** be the `public/` directory — never the project root
-(that would expose `.env`).
-
-- **VPS / full control:** set the vhost `DocumentRoot` to `.../lapak/public`.
-- **Shared host where the doc root is fixed** (e.g. `public_html`): put the app
-  one level above `public_html`, then either symlink
-  (`ln -s ../lapak/public/* public_html/`) or move the contents of `public/`
-  into `public_html` and fix the two `require` paths in `public_html/index.php`
-  to point at the app directory. Symlinking is cleaner.
+Remove the one-off cron job afterwards.
 
 ---
 
 ## 9. File permissions
 
-These must be writable by the web server user:
+`storage/` and `bootstrap/cache/` must be writable by the web user, and product
+images are written under `public/uploads/products` (with an `.htaccess` that
+disables script execution there). On shared hosting these are usually correct by
+default; if you see write errors, set them to `755`/`775` via File Manager →
+Permissions. No `storage:link` is required (uploads go straight under `public/`).
 
-```bash
-chmod -R ug+rw storage bootstrap/cache
-mkdir -p public/uploads/products && chmod -R ug+rw public/uploads
-```
-
-Product images are written directly under `public/uploads/products` (with an
-`.htaccess` that disables script execution there) — no `storage:link` is
-required for them. Run `php artisan storage:link` only if you later use the
-`storage` disk for public files.
+> Config caching (`config:cache`/`route:cache`) is **skipped** — it needs CLI
+> access this plan doesn't reliably offer, and the app runs correctly without it
+> at this traffic level. If you later want it, run it from a cron job once.
 
 ---
 
 ## Post-deploy checklist
 
-- [ ] `https://your-domain` loads the login page over HTTPS
-- [ ] You can sign in (demo owner, or your real account)
+- [ ] `https://your-domain` loads the login page over HTTPS; `/.env` is **not** reachable
+- [ ] Migrations have run (§7); signing in works (demo owner, or your account)
 - [ ] Owner sees **Reports** with populated charts; **Export PDF** returns a PDF
 - [ ] A test sale completes and stock decrements
 - [ ] Uploading a product photo succeeds and renders (confirms `gd` + perms)
-- [ ] The passwordless `/login/as/{role}` demo buttons are **absent** — they are
-      registered only in `local`/`testing`, never in production (by design)
+- [ ] The passwordless `/login/as/{role}` demo buttons are **absent** (local/testing only, by design)
+- [ ] `.env` and `public/uploads/` survived the deploy (back them up first)
 
 ---
 
@@ -179,9 +206,11 @@ required for them. Run `php artisan storage:link` only if you later use the
 
 | Symptom | Likely cause / fix |
 | ------- | ------------------ |
-| **500 on every page** | Missing `APP_KEY` (`php artisan key:generate`), unwritable `storage/`, or a stale cache — run `php artisan optimize:clear`. Check `storage/logs/laravel.log`. |
-| **Everyone gets 403** | Roles weren't seeded — see step 6. Then `php artisan permission:cache-reset` if available, or `php artisan optimize:clear`. |
-| **`could not find driver`** | `pdo_mysql` not enabled for the active PHP version. |
+| **`deploy` branch missing dependencies / unstyled site** | CI didn't force-add `vendor`/`public/build`, or the build failed — check the Actions run log. |
+| **Actions can't push `deploy`** | Repo → Settings → Actions → Workflow permissions → **Read and write**. |
+| **500 on every page** | Missing/incorrect `APP_KEY`, unwritable `storage/`, or DB credentials wrong. Temporarily set `APP_DEBUG=true` (then revert) and check `storage/logs/laravel.log`. |
+| **Everyone gets 403** | Roles weren't seeded — see §8. |
+| **`/deploy/migrate` returns 404** | `DEPLOY_MIGRATE_TOKEN` not set in `.env`, or token mismatch (by design). |
+| **`could not find driver`** | `pdo_mysql` not enabled for the active PHP version (hPanel → PHP Configuration). |
 | **Image upload fails / 500** | `gd` extension missing, or `public/uploads/products` not writable. |
-| **CSS/JS missing (unstyled page)** | `public/build` not deployed — re-run step 5. |
-| **Config changes ignored** | Cached config — re-run step 7 (or `optimize:clear`). |
+| **`.env` disappeared after a deploy** | Auto-deploy wiped untracked files — restore from backup; keep `.env` outside the deploy dir if it recurs. |

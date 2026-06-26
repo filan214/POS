@@ -1,0 +1,66 @@
+name: Build and Deploy to Hostinger
+
+# Hostinger's hPanel Git integration only *copies* files from a branch — it does
+# not run composer, npm, or artisan. So this workflow builds the app on every
+# push to `main` and force-pushes the fully built result to a `deploy` branch,
+# which hPanel is configured to auto-deploy. See DEPLOY.md for the full picture.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Required so the default GITHUB_TOKEN may push the built `deploy` branch.
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+
+      # PHP 8.2 matches composer.json ("php": "^8.2").
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+          extensions: pdo_mysql, gd, mbstring, bcmath, ctype, fileinfo, xml
+
+      # Node 20 satisfies Vite 6 (no engines pin in package.json).
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # A throwaway .env lets composer's post-autoload "package:discover" and
+      # Vite read a valid environment. It is deleted again before publishing and
+      # is gitignored, so it never reaches the deploy branch. The real .env lives
+      # only on the server (created once via hPanel File Manager).
+      - name: Provide a throwaway .env for build scripts
+        run: cp .env.production.example .env
+
+      - name: Install Composer dependencies (production only)
+        run: composer install --no-dev --optimize-autoloader --prefer-dist --no-interaction
+
+      - name: Install npm dependencies and build frontend assets
+        run: |
+          npm ci
+          npm run build
+
+      - name: Strip files the server doesn't need
+        run: rm -rf node_modules tests .env database/database.sqlite
+
+      - name: Publish built app to the deploy branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan deploy-tmp
+          git add -A
+          # vendor/ and public/build are gitignored for normal development, but
+          # the deploy branch is the built artifact — force them in, or the host
+          # would receive code with no dependencies and no compiled assets.
+          git add -f vendor public/build
+          git commit -m "Deploy build: ${{ github.sha }}"
+          git push origin deploy-tmp:deploy --force

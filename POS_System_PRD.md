@@ -122,13 +122,48 @@ The application is built with **Laravel**, deployed to a **shared hosting** envi
 
 ---
 
-## 7. Deployment Workflow (Shared Hosting, No SSH)
+## 7. Deployment Workflow (Hostinger Single — Shared Hosting, No SSH)
 
-1. **Develop locally** — `composer install`, `npm run build` (Vite) run entirely on the local machine.
-2. **Package** — Zip the project, including the `vendor/` directory and the built `public/build` assets (the server cannot run Composer or npm).
-3. **Upload** — Transfer via FTP or cPanel File Manager (no `git pull` on the server unless cPanel Git Version Control is confirmed available on this plan).
-4. **Run migrations** — Use a temporary `deploy.php` script (calling `Artisan::call('migrate')`) accessed once via browser, then deleted immediately.
-5. **Verify** — Confirm the application loads correctly, check `.env` configuration, and confirm file permissions on `storage/` and `public/uploads/`.
+The production host is **Hostinger's "Single" shared plan** (~Rp 12,900/mo).
+**SSH is not available on this tier** — confirmed with Hostinger support; SSH
+starts at Web Premium, and we are staying on Single. hPanel's **Git** integration
+(Websites → Advanced → GIT, connected over GitHub OAuth — no SSH key) only
+**copies files** from a branch; it does **not** run `composer install`,
+`npm run build`, or any `artisan` command. The strategy is therefore *build in
+CI, deploy a pre-built branch*:
+
+1. **Develop on `main`** — kept clean as usual; `vendor/`, `public/build/`, and
+   `.env` stay gitignored and are never committed.
+2. **Build in GitHub Actions** — on every push to `main`,
+   `.github/workflows/deploy-hostinger.yml` runs `composer install --no-dev` and
+   `npm run build` on an Ubuntu runner, then **force-pushes the fully built tree
+   (including `vendor/` and `public/build/`) to a `deploy` branch**.
+3. **Auto-deploy via hPanel Git** — hPanel's Git feature is connected to the
+   `deploy` branch with auto-deployment enabled, so the host always serves the
+   pre-built output. No build tooling ever runs on the server.
+4. **Run migrations without SSH** — an idempotent artisan command,
+   `app:run-pending-migrations` (wrapping `migrate --force`), triggered one of two
+   ways:
+   - **Preferred:** an **hPanel Cron Job** (Advanced → Cron Jobs) running the
+     command on a schedule — no public surface. (Confirm the minimum interval
+     allowed on the Single plan.)
+   - **Fallback (no cron):** a **token-protected route**, `GET /deploy/migrate`,
+     gated by a secret `DEPLOY_MIGRATE_TOKEN` from `.env`. It returns 404 unless
+     the token is set, compares it in constant time, runs only idempotent
+     migrations, and is safe to leave in the repo **permanently** — which matters
+     now that continuous auto-deploy means any committed file reappears on every
+     redeploy, so the old "delete a `deploy.php` after use" trick no longer
+     sticks. The route runs without session middleware so it works on the very
+     first deploy, before any tables exist.
+5. **`.env` handling** — created **once, manually** via hPanel → File Manager by
+   copying `.env.production.example` to `.env` and filling in the DB credentials,
+   `APP_URL`, `SESSION_DOMAIN`, and `APP_KEY`. It is **not committed to any
+   branch**. ⚠️ **Open risk:** hPanel Git auto-deploy may wipe files not present
+   on the `deploy` branch — **back up the live `.env` before the first real
+   redeploy** and verify it survives; if it gets removed, restore from backup (or
+   keep it outside the deployed directory).
+6. **Verify** — app loads over HTTPS, `.env` is correct, migrations have run, and
+   `storage/` + `public/uploads/` are writable.
 
 ---
 

@@ -1,14 +1,27 @@
 <?php
 
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\DeployController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ShiftController;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
+use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Route;
+use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 Route::get('/', fn () => redirect()->route('pos'));
+
+// Deploy hook — runs pending migrations on a host with no SSH (see DEPLOY.md).
+// Disabled (404) unless DEPLOY_MIGRATE_TOKEN is set on the server; protected by
+// a constant-time token check. Session + CSRF middleware are stripped so it
+// works on the very first deploy, before the `sessions` table exists (both the
+// session store and the CSRF cookie would otherwise touch the missing table).
+Route::get('/deploy/migrate', [DeployController::class, 'migrate'])
+    ->withoutMiddleware([StartSession::class, ShareErrorsFromSession::class, ValidateCsrfToken::class])
+    ->name('deploy.migrate');
 
 // Demo shortcut — passwordless sign-in as a seeded owner/cashier.
 // Registered ONLY in local/testing so it can never bypass auth in production.
