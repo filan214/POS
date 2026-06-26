@@ -35,6 +35,11 @@ return [
     'new_sale' => 'Penjualan baru',
     'print_receipt' => 'Cetak struk',
 
+    'printer' => [
+        'connect' => 'Hubungkan printer thermal',
+        'connected' => 'Printer thermal terhubung',
+    ],
+
     'receipt' => [
         'store' => 'Warung Tanti',
         'address' => 'Jogonalan Lor RT 04, Tirtonirmolo, Kasihan, Bantul',
@@ -50,6 +55,7 @@ return [
         'method' => 'Metode',
         'thanks' => 'Terima kasih, sampai jumpa lagi!',
         'footer' => 'Barang yang dibeli tidak dapat ditukar',
+        'promo' => 'Didukung oleh Lapak POS',
     ],
 
     // Teks yang dipakai dari JavaScript.
@@ -60,6 +66,10 @@ return [
         'unknown_barcode' => 'Barcode tidak dikenal',
         'saved' => 'Penjualan selesai',
         'sale_failed' => 'Penjualan gagal diselesaikan',
+        'printer_connected' => 'Printer terhubung',
+        'printer_printed' => 'Struk dikirim ke printer',
+        'printer_failed' => 'Printer tidak tersedia — membuka dialog cetak',
+        'printer_unsupported' => 'Cetak langsung perlu Chrome atau Edge',
     ],
 
     'no_shift_title' => 'Buka shift untuk mulai berjualan',

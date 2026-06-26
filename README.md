@@ -19,6 +19,7 @@ Lapak is a full-stack Laravel application built as a portfolio piece: a real, at
 - **Role-based access** — owners manage products and see reports; cashiers ring up sales and run their own shifts. Enforced with [spatie/laravel-permission](https://spatie.be/docs/laravel-permission).
 - **Bilingual** — full English / Bahasa Indonesia localization, switchable per user with no hardcoded UI strings.
 - **Hardened image uploads** — product photos are MIME-sniffed server-side, re-encoded to compressed WebP, and stored in a no-exec directory.
+- **Hardware-ready checkout** — a timing-based listener turns any USB/Bluetooth barcode scanner into keyboard input, and completed sales print straight to an ESC/POS thermal printer over **WebUSB** (with a browser print-dialog fallback when no printer is paired) — no drivers, no backend.
 
 ---
 
@@ -108,16 +109,19 @@ In **local/testing only**, the login screen also offers one-tap "Enter as Owner 
 ## Testing
 
 ```bash
-php artisan test
+php artisan test     # PHP feature suite
+npm run test:js      # ESC/POS receipt encoder (Node's built-in test runner)
 ```
 
-Feature tests cover the guest redirect, role-based 403s, atomic stock decrement, and sale rejection when there's no open shift or insufficient stock, plus the inherited Breeze auth flows.
+Feature tests cover the guest redirect, role-based 403s, atomic stock decrement, and sale rejection when there's no open shift or insufficient stock, plus the inherited Breeze auth flows. The suite passes on both SQLite (CI/local) and MariaDB 10.4. The thermal-receipt byte encoder is unit-tested separately in pure Node — no browser or extra dependency.
 
 ---
 
-## Deployment target
+## Deployment
 
-The production target is a **MariaDB** shared host. Point `DB_*` in `.env` at MariaDB, set `APP_ENV=production` and `APP_DEBUG=false`, run `php artisan migrate --force` and (once) the seeder for roles, then `npm run build`. Confirm the **GD** extension is available for image processing.
+The production target is a **MariaDB** shared host. Schema, the full seed, and the entire test suite are **verified green on MariaDB 10.4** (Laravel strict mode, `ONLY_FULL_GROUP_BY` included) — local dev just stays on SQLite for convenience.
+
+A copy-paste production env template lives in [`.env.production.example`](.env.production.example), and the full step-by-step — database setup, asset build, document root, permissions, and a troubleshooting table — is in **[DEPLOY.md](DEPLOY.md)**.
 
 ---
 

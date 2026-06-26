@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Hide Alpine-cloaked elements until the component initializes. */
+[x-cloak] {
+    display: none !important;
+}
+
 @layer base {
     html {
         -webkit-text-size-adjust: 100%;

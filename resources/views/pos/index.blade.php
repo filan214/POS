@@ -11,6 +11,38 @@
         'low' => __('common.status.low_stock'),
         'out' => __('common.status.out_of_stock'),
         'pcs' => __('common.misc.pcs'),
+        'printer_connected' => __('pos.js.printer_connected'),
+        'printer_failed' => __('pos.js.printer_failed'),
+        'printer_printed' => __('pos.js.printer_printed'),
+        'printer_unsupported' => __('pos.js.printer_unsupported'),
+    ];
+
+    // Receipt metadata for the thermal (ESC/POS) printer path.
+    $receipt = [
+        'store' => [
+            'name' => __('pos.receipt.store'),
+            'address' => __('pos.receipt.address'),
+            'phone' => __('pos.receipt.phone'),
+        ],
+        'labels' => [
+            'no' => __('pos.receipt.no'),
+            'date' => __('pos.receipt.date'),
+            'cashier' => __('pos.receipt.cashier'),
+            'total' => __('pos.receipt.total'),
+            'method' => __('pos.receipt.method'),
+            'paid' => __('pos.receipt.paid'),
+            'change' => __('pos.receipt.change'),
+        ],
+        'methods' => [
+            'cash' => __('common.payment.cash'),
+            'qris' => __('common.payment.qris'),
+            'debit' => __('common.payment.debit'),
+        ],
+        'cashier' => $cashierName,
+        'dateLocale' => app()->getLocale() === 'en' ? 'en-GB' : 'id-ID',
+        'thanks' => __('pos.receipt.thanks'),
+        'footer' => __('pos.receipt.footer'),
+        'promo' => __('pos.receipt.promo'),
     ];
 @endphp
 
@@ -34,6 +66,7 @@
             'saleUrl' => route('pos.sale'),
             'csrf' => csrf_token(),
             'hasShift' => (bool) $shift,
+            'receipt' => $receipt,
          ]) }})"
          class="grid gap-6 lg:grid-cols-[1fr_400px] xl:grid-cols-[1fr_420px]">
 
@@ -268,8 +301,19 @@
                             </div>
                         </div>
 
+                        {{-- Thermal printer (WebUSB) pairing — only where the browser supports it --}}
+                        <div class="px-5 pt-3 no-print" x-show="printerSupported" x-cloak>
+                            <button x-show="!printerConnected" @click="connectPrinter()"
+                                    class="inline-flex items-center gap-1.5 text-xs font-semibold text-ink-500 hover:text-ink-800 transition-colors">
+                                <x-icon name="printer" class="h-4 w-4" /> {{ __('pos.printer.connect') }}
+                            </button>
+                            <span x-show="printerConnected" class="inline-flex items-center gap-1.5 text-xs font-semibold text-jade-700">
+                                <span class="h-1.5 w-1.5 rounded-full bg-jade"></span> {{ __('pos.printer.connected') }}
+                            </span>
+                        </div>
+
                         <div class="grid grid-cols-2 gap-2 border-t border-ink/[.06] px-5 py-4 no-print">
-                            <button @click="printReceipt()" class="btn-outline"><x-icon name="printer" class="h-5 w-5" /> {{ __('pos.print_receipt') }}</button>
+                            <button @click="printReceipt()" :disabled="printerBusy" class="btn-outline disabled:opacity-60"><x-icon name="printer" class="h-5 w-5" /> {{ __('pos.print_receipt') }}</button>
                             <button @click="newSale()" class="btn-primary"><x-icon name="plus" class="h-5 w-5" /> {{ __('pos.new_sale') }}</button>
                         </div>
                     </div>

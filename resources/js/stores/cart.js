@@ -1,4 +1,6 @@
 import { createBarcodeBuffer } from './barcode';
+import { encodeReceipt } from '../print/escpos';
+import { createThermalPrinter, thermalPrinterSupported } from '../print/webusb';
 
 const idr = new Intl.NumberFormat('id-ID', {
     style: 'currency',
@@ -6,6 +8,10 @@ const idr = new Intl.NumberFormat('id-ID', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
 });
+
+// Plain "Rp 19.500" for the thermal receipt — no non-breaking space, which a
+// single-byte ESC/POS code page would mangle.
+const plainIdr = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 });
 
 /**
  * The POS cart. Products are seeded from the server (real DB rows) and the
@@ -18,14 +24,16 @@ const idr = new Intl.NumberFormat('id-ID', {
  * @param {string} config.saleUrl    POST endpoint for completing a sale
  * @param {string} config.csrf       CSRF token
  * @param {boolean} config.hasShift  Whether the cashier has an open shift
+ * @param {object} config.receipt   Receipt metadata (store, labels, cashier) for thermal printing
  */
-export default function posCart({ products = [], t = {}, saleUrl = '', csrf = '', hasShift = false } = {}) {
+export default function posCart({ products = [], t = {}, saleUrl = '', csrf = '', hasShift = false, receipt = null } = {}) {
     return {
         products,
         t,
         saleUrl,
         csrf,
         hasShift,
+        receipt,
         items: [],
         search: '',
         category: 'all',
@@ -36,11 +44,24 @@ export default function posCart({ products = [], t = {}, saleUrl = '', csrf = ''
         submitting: false,
         toast: null,
         receiptNo: null,
+        // Thermal printer (WebUSB). The device lives inside the printer closure,
+        // so Alpine only ever sees the boolean below.
+        printer: null,
+        printerSupported: false,
+        printerConnected: false,
+        printerBusy: false,
 
         init() {
             // Attach the timing-based barcode listener for this screen.
             const handler = createBarcodeBuffer({ onScan: (code) => this.scan(code) });
             window.addEventListener('keydown', handler);
+
+            // Set up the thermal printer and silently reconnect a known one.
+            this.printerSupported = thermalPrinterSupported();
+            if (this.printerSupported) {
+                this.printer = createThermalPrinter();
+                this.printer.reconnect().then((ok) => (this.printerConnected = ok)).catch(() => {});
+            }
         },
 
         // ---- Catalogue helpers -------------------------------------------
@@ -247,13 +268,78 @@ export default function posCart({ products = [], t = {}, saleUrl = '', csrf = ''
             this.receiptNo = null;
         },
 
-        printReceipt() {
+        // ---- Receipt printing -------------------------------------------
+        // Pair a thermal printer over WebUSB (needs a user gesture).
+        async connectPrinter() {
+            if (!this.printerSupported) {
+                this.flash(this.t.printer_unsupported || 'Direct printing needs Chrome or Edge', 'error');
+                return;
+            }
+            try {
+                await this.printer.connect();
+                this.printerConnected = true;
+                this.flash(this.t.printer_connected || 'Printer connected');
+            } catch (e) {
+                // The browser throws NotFoundError when the chooser is dismissed — not a real failure.
+                if (e && e.name === 'NotFoundError') return;
+                this.flash(this.t.printer_failed || 'Could not connect to the printer', 'error');
+            }
+        },
+
+        // Print to the paired thermal printer; fall back to the browser dialog.
+        async printReceipt() {
+            if (this.printerConnected && this.printer) {
+                this.printerBusy = true;
+                try {
+                    await this.printer.print(this.buildReceiptBytes());
+                    this.flash(this.t.printer_printed || 'Receipt sent to printer');
+                    return;
+                } catch (e) {
+                    this.printerConnected = false;
+                    this.flash(this.t.printer_failed || 'Printer unavailable — opening the print dialog', 'error');
+                    // fall through to the browser dialog
+                } finally {
+                    this.printerBusy = false;
+                }
+            }
             window.print();
+        },
+
+        // Build the ESC/POS byte stream for the just-completed sale.
+        buildReceiptBytes() {
+            const r = this.receipt;
+            return encodeReceipt({
+                store: r.store,
+                labels: r.labels,
+                values: {
+                    no: this.receiptNo || '-',
+                    date: this.now.toLocaleString(r.dateLocale),
+                    cashier: r.cashier,
+                },
+                items: this.items.map((i) => ({
+                    name: i.name,
+                    qty: i.qty,
+                    unitPriceText: this.printMoney(i.unit_price),
+                    subtotalText: this.printMoney(i.unit_price * i.qty),
+                })),
+                methodText: r.methods[this.paymentMethod] || this.paymentMethod,
+                totalText: this.printMoney(this.total),
+                isCash: this.paymentMethod === 'cash',
+                paidText: this.printMoney(this.paid),
+                changeText: this.printMoney(this.change),
+                thanks: r.thanks,
+                footer: r.footer,
+                promo: r.promo,
+            });
         },
 
         // ---- Formatting / feedback --------------------------------------
         money(value) {
             return idr.format(value || 0);
+        },
+
+        printMoney(value) {
+            return 'Rp ' + plainIdr.format(value || 0);
         },
 
         flash(message, type = 'success') {

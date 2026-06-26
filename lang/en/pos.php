@@ -35,6 +35,11 @@ return [
     'new_sale' => 'New sale',
     'print_receipt' => 'Print receipt',
 
+    'printer' => [
+        'connect' => 'Connect thermal printer',
+        'connected' => 'Thermal printer connected',
+    ],
+
     'receipt' => [
         'store' => 'Warung Tanti',
         'address' => 'Jogonalan Lor RT 04, Tirtonirmolo, Kasihan, Bantul',
@@ -50,6 +55,7 @@ return [
         'method' => 'Method',
         'thanks' => 'Thank you, see you again!',
         'footer' => 'Goods purchased cannot be exchanged',
+        'promo' => 'Powered by Lapak POS',
     ],
 
     // Strings surfaced from JavaScript.
@@ -60,6 +66,10 @@ return [
         'unknown_barcode' => 'Unknown barcode',
         'saved' => 'Sale completed',
         'sale_failed' => 'Could not complete the sale',
+        'printer_connected' => 'Printer connected',
+        'printer_printed' => 'Receipt sent to printer',
+        'printer_failed' => 'Printer unavailable — opening the print dialog',
+        'printer_unsupported' => 'Direct printing needs Chrome or Edge',
     ],
 
     'no_shift_title' => 'Open a shift to start selling',
