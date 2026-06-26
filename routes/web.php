@@ -6,6 +6,7 @@ use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\SaleController;
 use App\Http\Controllers\ShiftController;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Session\Middleware\StartSession;
@@ -53,6 +54,9 @@ Route::middleware('auth')->group(function () {
 
         Route::get('/reports', [ReportController::class, 'dashboard'])->name('reports');
         Route::get('/reports/pdf', [ReportController::class, 'exportPdf'])->name('reports.pdf');
+
+        // Void a completed sale (reverses stock, audited).
+        Route::post('/sales/{sale}/void', [SaleController::class, 'void'])->name('sales.void');
     });
 });
 

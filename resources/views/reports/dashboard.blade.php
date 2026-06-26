@@ -12,6 +12,14 @@
             </x-slot:actions>
         </x-page-header>
 
+        {{-- Flash (e.g. after voiding a sale) --}}
+        @if (session('status') || session('error'))
+            <div class="mt-5 flex items-center gap-2.5 rounded-xl border px-4 py-3 text-sm font-semibold {{ session('error') ? 'border-chili/30 bg-chili-50 text-chili-700' : 'border-jade/30 bg-jade-50 text-jade-700' }}">
+                <x-icon name="{{ session('error') ? 'alert' : 'check-circle' }}" class="h-5 w-5 shrink-0" />
+                <span>{{ session('error') ?? session('status') }}</span>
+            </div>
+        @endif
+
         {{-- Stat cards --}}
         <div class="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-5">
             <x-stat-card :label="__('reports.stat.sales')" :value="rupiah($stats['sales'])" :delta="$stats['sales_delta']" :delta-label="__('reports.stat.vs_prev')" icon="banknotes" tone="jade" />
@@ -142,6 +150,7 @@
                             <th class="px-5 py-2.5 font-semibold">{{ __('reports.recent.method') }}</th>
                             <th class="px-5 py-2.5 text-right font-semibold">{{ __('reports.recent.items') }}</th>
                             <th class="px-5 py-2.5 text-right font-semibold">{{ __('reports.recent.total') }}</th>
+                            <th class="px-5 py-2.5 text-right font-semibold"><span class="sr-only">{{ __('reports.void.action') }}</span></th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-ink/[.05]">
@@ -155,6 +164,13 @@
                                 <td class="px-5 py-2.5"><x-badge :variant="$mv">{{ __('common.payment.'.$s['method']) }}</x-badge></td>
                                 <td class="px-5 py-2.5 text-right font-mono text-ink-600 tabular">{{ $s['items'] }}</td>
                                 <td class="px-5 py-2.5 text-right font-mono font-semibold text-ink-900 tabular">{{ rupiah($s['total']) }}</td>
+                                <td class="px-5 py-2.5 text-right">
+                                    <form method="POST" action="{{ route('sales.void', $s['id']) }}"
+                                          onsubmit="return confirm('{{ __('reports.void.confirm', ['code' => $s['code']]) }}')">
+                                        @csrf
+                                        <button type="submit" class="text-xs font-semibold text-ink-400 transition-colors hover:text-chili-600">{{ __('reports.void.action') }}</button>
+                                    </form>
+                                </td>
                             </tr>
                         @endforeach
                     </tbody>

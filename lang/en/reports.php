@@ -65,4 +65,11 @@ return [
         'items' => 'Items',
         'total' => 'Total',
     ],
+
+    'void' => [
+        'action' => 'Void',
+        'confirm' => 'Void sale :code? Stock will be restored and this cannot be undone.',
+        'done' => 'Sale :code was voided and stock restored.',
+        'already' => 'Sale :code is not a completed sale, so it cannot be voided.',
+    ],
 ];

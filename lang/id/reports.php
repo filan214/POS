@@ -65,4 +65,11 @@ return [
         'items' => 'Barang',
         'total' => 'Total',
     ],
+
+    'void' => [
+        'action' => 'Batalkan',
+        'confirm' => 'Batalkan transaksi :code? Stok akan dikembalikan dan tindakan ini tidak dapat dibatalkan.',
+        'done' => 'Transaksi :code dibatalkan dan stok dikembalikan.',
+        'already' => 'Transaksi :code bukan transaksi selesai, jadi tidak bisa dibatalkan.',
+    ],
 ];

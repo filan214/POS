@@ -10,6 +10,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
 class ReportController extends Controller
@@ -186,7 +187,7 @@ class ReportController extends Controller
     }
 
     /** Best sellers by units sold over the selected range. */
-    private function topProducts(Carbon $start, Carbon $end): \Illuminate\Support\Collection
+    private function topProducts(Carbon $start, Carbon $end): Collection
     {
         return SaleItem::query()
             ->join('products', 'products.id', '=', 'sale_items.product_id')
@@ -207,7 +208,7 @@ class ReportController extends Controller
     }
 
     /** Closed-shift cash reconciliation (owner sees all cashiers). */
-    private function reconciliation(): \Illuminate\Support\Collection
+    private function reconciliation(): Collection
     {
         return Shift::with('cashier')
             ->where('status', 'closed')
@@ -223,7 +224,7 @@ class ReportController extends Controller
             ]);
     }
 
-    private function recentSales(): \Illuminate\Support\Collection
+    private function recentSales(): Collection
     {
         return Sale::withCount('items')
             ->where('status', 'completed')
@@ -231,6 +232,7 @@ class ReportController extends Controller
             ->limit(6)
             ->get()
             ->map(fn (Sale $s) => [
+                'id' => $s->id,
                 'code' => $s->code,
                 'at' => $s->created_at,
                 'method' => $s->payment_method,

@@ -20,12 +20,15 @@ class Sale extends Model
         'paid_amount',
         'change_amount',
         'status',
+        'voided_at',
+        'voided_by',
     ];
 
     protected $casts = [
         'total' => 'integer',
         'paid_amount' => 'integer',
         'change_amount' => 'integer',
+        'voided_at' => 'datetime',
     ];
 
     public function shift(): BelongsTo
@@ -38,9 +41,25 @@ class Sale extends Model
         return $this->belongsTo(User::class, 'cashier_id');
     }
 
+    /** The owner who voided this sale, if any. */
+    public function voidedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'voided_by');
+    }
+
     public function items(): HasMany
     {
         return $this->hasMany(SaleItem::class);
+    }
+
+    public function isCompleted(): bool
+    {
+        return $this->status === 'completed';
+    }
+
+    public function isVoided(): bool
+    {
+        return $this->status === 'voided';
     }
 
     /** Gross profit = revenue − snapshotted cost of goods. */

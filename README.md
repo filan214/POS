@@ -14,6 +14,7 @@ Lapak is a full-stack Laravel application built as a portfolio piece: a real, at
 
 - **Atomic checkout** — every sale runs inside a database transaction with row locking, so stock can never go negative and concurrent tills stay consistent.
 - **Self-updating inventory** — each sale decrements stock and writes a `StockMovement` audit row; manual adjustments are logged too.
+- **Owner-approved voids** — an owner can reverse a completed sale; the void restores stock atomically, logs the reversal, stamps who/when, and drops the sale out of every report and cash reconciliation.
 - **Cashier shifts** — open/close a till with a cash float, and reconcile expected vs. counted cash at close.
 - **Owner reporting** — today-vs-yesterday deltas, a 7-day trend, category breakdown, top sellers, and shift reconciliation, with **PDF export**.
 - **Role-based access** — owners manage products and see reports; cashiers ring up sales and run their own shifts. Enforced with [spatie/laravel-permission](https://spatie.be/docs/laravel-permission).
